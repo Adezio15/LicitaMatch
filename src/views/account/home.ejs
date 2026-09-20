@@ -1,0 +1,18 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page">
+  <header class="page-heading"><span class="eyebrow">MINHA CONTA</span><h1>Olá, <%= user.nome %>.</h1><p class="muted"><%= user.nome_fantasia || user.razao_social %></p></header>
+  <div class="grid two">
+    <section class="panel"><h2>Seu acesso</h2><dl><dt>E-mail</dt><dd><%= user.email %></dd><dt>Permissão</dt><dd><%= { usuario: 'Usuário', gestor: 'Gestor da empresa', admin: 'Administrador' }[user.tipo] %></dd></dl><a href="/empresa">Ver dados da empresa →</a></section>
+    <section class="panel"><h2>Alterar senha</h2><p class="muted">Após a alteração, você precisará entrar novamente em todos os dispositivos.</p>
+      <form method="post" action="/conta/senha" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Senha atual<input type="password" name="senha_atual" autocomplete="current-password" required></label>
+        <label>Nova senha<input type="password" name="senha" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+        <small class="muted">Mínimo de 12 caracteres; máximo de 72 bytes.</small>
+        <button class="button" type="submit">Salvar nova senha</button>
+      </form>
+    </section>
+  </div>
+</main>
+<%- include('../partials/footer') %>

@@ -1,0 +1,42 @@
+{
+  "name": "licitamatch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Monitoramento multiempresa de licitações públicas brasileiras",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "predev": "node scripts/local-db.js ensure",
+    "dev": "node --watch src/server.js",
+    "db:local:setup": "node scripts/local-db.js setup",
+    "db:local:start": "node scripts/local-db.js start",
+    "db:local:stop": "node scripts/local-db.js stop",
+    "db:local:status": "node scripts/local-db.js status",
+    "test:postgres": "node scripts/check-postgres.js",
+    "start": "node src/server.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^18.0.1",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "embedded-postgres": "17.10.0-beta.17",
+    "supertest": "^7.2.2"
+  }
+}

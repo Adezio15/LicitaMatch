@@ -1,0 +1,26 @@
+<%- include('../partials/head') %>
+<main class="page narrow">
+  <a class="brand" href="/login"><span class="brand-mark">L</span> Licita<span>Match</span></a>
+  <header class="page-heading"><span class="eyebrow">COMECE POR AQUI</span><h1>Cadastre sua empresa</h1><p class="muted">Você será o primeiro gestor da conta e poderá adicionar sua equipe.</p></header>
+  <form method="post" action="/cadastro" class="panel stack">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <h2>Dados da empresa</h2>
+    <div class="grid two">
+      <label>Razão social<input name="razao_social" autocomplete="organization" maxlength="200" required></label>
+      <label>Nome fantasia <span class="optional">(opcional)</span><input name="nome_fantasia" maxlength="200"></label>
+      <label>CNPJ<input name="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00" maxlength="18" required></label>
+      <label>E-mail da empresa<input type="email" name="email_empresa" maxlength="254" required></label>
+      <label>Telefone <span class="optional">(opcional)</span><input type="tel" name="telefone" autocomplete="tel" maxlength="30"></label>
+      <label>Cidade <span class="optional">(opcional)</span><input name="cidade" autocomplete="address-level2" maxlength="100"></label>
+      <label>Estado <span class="optional">(opcional)</span><select name="estado"><option value="">Selecione</option><% for (const state of states) { %><option><%= state %></option><% } %></select></label>
+    </div>
+    <hr><h2>Seu acesso</h2>
+    <label>Seu nome<input name="nome" autocomplete="name" maxlength="150" required></label>
+    <label>Seu e-mail de acesso<input type="email" name="email" autocomplete="username" maxlength="254" required></label>
+    <label>Crie uma senha<input type="password" name="senha" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required></label>
+    <small id="password-help" class="muted">Use pelo menos 12 caracteres. Senhas com acentos ou emojis podem atingir o limite de 72 bytes antes de 72 caracteres.</small>
+    <button class="button" type="submit">Criar conta da empresa</button>
+    <a class="center" href="/login">Já tenho uma conta</a>
+  </form>
+</main>
+<%- include('../partials/footer') %>

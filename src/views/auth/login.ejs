@@ -1,0 +1,27 @@
+<%- include('../partials/head') %>
+<main class="auth-shell">
+  <section class="auth-story">
+    <a class="brand light" href="/login"><span class="brand-mark">L</span> Licita<span>Match</span></a>
+    <div>
+      <span class="eyebrow">INTELIGÊNCIA EM OPORTUNIDADES</span>
+      <h1>O próximo negócio da sua empresa começa aqui.</h1>
+      <p>Um lugar para acompanhar licitações compatíveis com o que sua empresa faz de melhor.</p>
+    </div>
+    <span class="story-foot">Licitações públicas. Novas possibilidades.</span>
+  </section>
+  <section class="auth-form">
+    <span class="eyebrow">BEM-VINDO DE VOLTA</span>
+    <h2>Acesse sua conta</h2>
+    <p class="muted">Entre com o e-mail cadastrado na sua empresa.</p>
+    <% if (changed) { %><p class="notice" role="status">Senha alterada. Entre novamente com a nova senha.</p><% } %>
+    <form method="post" action="/login" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>E-mail<input type="email" name="email" autocomplete="username" placeholder="voce@empresa.com.br" maxlength="254" required></label>
+      <label>Senha<input type="password" name="senha" autocomplete="current-password" required></label>
+      <label class="checkbox"><input type="checkbox" name="lembrar"> Lembrar acesso por 30 dias</label>
+      <button class="button" type="submit">Entrar na minha conta <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="signup-link">Ainda não tem uma conta? <a href="/cadastro">Cadastre sua empresa</a></p>
+  </section>
+</main>
+<%- include('../partials/footer') %>

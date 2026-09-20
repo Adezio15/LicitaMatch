@@ -1,0 +1,22 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page narrow">
+  <header class="page-heading"><span class="eyebrow">DADOS CADASTRAIS</span><h1>Sua empresa</h1><p class="muted">CNPJ: <%= company.cnpj %> · Plano: <%= company.plano %> · Status: <%= company.status %></p></header>
+  <% if (saved) { %><p class="notice" role="status">Dados da empresa atualizados.</p><% } %>
+  <form method="post" action="/empresa" class="panel stack">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <fieldset <%= ['gestor', 'admin'].includes(user.tipo) ? '' : 'disabled' %>>
+      <legend>Informações da empresa</legend>
+      <div class="grid two">
+        <label>Razão social<input name="razao_social" value="<%= company.razao_social %>" maxlength="200" required></label>
+        <label>Nome fantasia<input name="nome_fantasia" value="<%= company.nome_fantasia || '' %>" maxlength="200"></label>
+        <label>E-mail<input name="email_empresa" type="email" value="<%= company.email %>" maxlength="254" required></label>
+        <label>Telefone<input name="telefone" value="<%= company.telefone || '' %>" maxlength="30"></label>
+        <label>Cidade<input name="cidade" value="<%= company.cidade || '' %>" maxlength="100"></label>
+        <label>Estado<select name="estado"><option value="">Selecione</option><% for (const state of states) { %><option <%= company.estado === state ? 'selected' : '' %>><%= state %></option><% } %></select></label>
+      </div>
+    </fieldset>
+    <% if (['gestor', 'admin'].includes(user.tipo)) { %><button class="button" type="submit">Salvar alterações</button><% } else { %><p class="muted">Apenas gestores podem editar os dados da empresa.</p><% } %>
+  </form>
+</main>
+<%- include('../partials/footer') %>

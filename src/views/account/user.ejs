@@ -1,0 +1,15 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page narrow">
+  <header class="page-heading"><a href="/usuarios">← Voltar à equipe</a><h1>Editar usuário</h1></header>
+  <form method="post" action="/usuarios/<%= target.id %>" class="panel stack">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Nome<input name="nome" value="<%= target.nome %>" maxlength="150" required></label>
+    <label>E-mail<input type="email" name="email" value="<%= target.email %>" maxlength="254" required></label>
+    <label>Permissão<select name="tipo"><option value="usuario" <%= target.tipo === 'usuario' ? 'selected' : '' %>>Usuário</option><option value="gestor" <%= target.tipo === 'gestor' ? 'selected' : '' %>>Gestor da empresa</option></select></label>
+    <label>Status<select name="ativo"><option value="true" <%= target.ativo ? 'selected' : '' %>>Ativo</option><option value="false" <%= !target.ativo ? 'selected' : '' %>>Inativo</option></select></label>
+    <p class="muted">Salvar alterações encerra os acessos anteriores deste usuário. Não é possível alterar seu próprio cadastro nesta tela.</p>
+    <button class="button" type="submit">Salvar usuário</button>
+  </form>
+</main>
+<%- include('../partials/footer') %>

@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page">
+  <header class="page-heading"><span class="eyebrow">EQUIPE</span><h1>Usuários da empresa</h1><p class="muted">Gerencie quem tem acesso à sua conta.</p></header>
+  <% if (saved) { %><p class="notice" role="status">Usuário salvo com sucesso.</p><% } %>
+  <section class="panel table-scroll"><table><caption>Equipe cadastrada (até 200 usuários)</caption><thead><tr><th>Nome</th><th>E-mail</th><th>Permissão</th><th>Status</th><th>Ação</th></tr></thead><tbody>
+    <% for (const member of users) { %><tr><td><%= member.nome %></td><td><%= member.email %></td><td><%= member.tipo %></td><td><span class="badge"><%= member.ativo ? 'Ativo' : 'Inativo' %></span></td><td><% if (String(member.id) !== String(user.id) && member.tipo !== 'admin') { %><a href="/usuarios/<%= member.id %>">Editar</a><% } else { %>—<% } %></td></tr><% } %>
+  </tbody></table></section>
+  <section class="panel section-gap"><h2>Adicionar usuário</h2>
+    <form method="post" action="/usuarios" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="grid two">
+        <label>Nome<input name="nome" maxlength="150" required></label>
+        <label>E-mail<input name="email" type="email" maxlength="254" autocomplete="off" required></label>
+        <label>Senha inicial<input name="senha" type="password" minlength="12" maxlength="72" autocomplete="new-password" required></label>
+        <label>Permissão<select name="tipo"><option value="usuario">Usuário</option><option value="gestor">Gestor da empresa</option></select></label>
+      </div>
+      <p class="muted">O gestor pode editar a empresa e administrar a equipe. O novo usuário poderá trocar a senha em Minha conta.</p>
+      <button class="button" type="submit">Adicionar usuário</button>
+    </form>
+  </section>
+</main>
+<%- include('../partials/footer') %>
