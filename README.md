@@ -81,7 +81,7 @@ Use `.env.production.example` como referência para as variáveis do Railway; el
 2. Configure `NODE_ENV=production`, `LOCAL_DATABASE=false`, `DATABASE_URL` com pooling, `DATABASE_DIRECT_URL` direta para o mesmo banco e um novo `SESSION_SECRET`.
 3. Use TLS (`sslmode=verify-full`); mantenha `APP_TIMEZONE=America/Fortaleza`. Ajuste `TRUST_PROXY_HOPS` ao proxy confiável do deploy para cookies Secure.
 4. Instale com `npm ci --omit=dev` e rode `npm run db:migrate` antes da liberação. O PostgreSQL local não é instalado como dependência de produção.
-5. Inicie com `npm start`. Esse comando não inicia banco local nem aplica migrations automaticamente. Use a `PORT` fornecida pelo Railway e `/health/ready` para verificar a conexão.
+5. Inicie com `npm start`: o comando aplica migrations pendentes, verifica o banco e só então inicia o servidor. Use a `PORT` fornecida pelo Railway e `/health/ready` para verificar a conexão.
 
 As migrations e o driver `pg` são os mesmos nos dois ambientes. Não é necessário mudar repositories ou services para apontar para Neon. Dados de desenvolvimento não são transferidos automaticamente. A conexão remota e o deploy ainda precisam ser validados quando as credenciais Neon estiverem disponíveis.
 
@@ -90,6 +90,8 @@ As migrations e o driver `pg` são os mesmos nos dois ambientes. Não é necess�
 O `railway.json` configura Railpack, migrations no pre-deploy, `npm start`, healthcheck em `/health/ready` e até três tentativas de reinício em caso de falha. Esses campos seguem a [configuração oficial do Railway](https://docs.railway.com/config-as-code/reference).
 
 O pre-deploy executa `npm run db:migrate && npm run db:check`. O primeiro comando prefere `DATABASE_DIRECT_URL` e usa `DATABASE_URL` quando a URL direta não foi configurada; compara as tabelas e o histórico antes de aplicar somente migrations pendentes, depois valida `SELECT 1`, tabelas e checksums. O segundo confirma o schema pela URL usada pela aplicação e também pela URL direta, quando presente. Uma falha impede a liberação do novo deploy. Não configure esses comandos como Build Command: eles precisam do ambiente de execução e acesso ao banco.
+
+Como garantia quando o pre-deploy não estiver sendo aplicado, `npm start` também executa `npm run db:migrate && npm run db:check && node src/server.js`. O servidor só é iniciado se ambas as etapas terminarem com sucesso. Quando o pre-deploy já aplicou as migrations, a segunda execução consulta o histórico e não reaplica as mesmas migrations. O lock transacional serializa execuções concorrentes. No Railway, mantenha Start Command como `npm start`: um comando manual `node src/server.js` ignora essa sequência. Confira também se o deployment usa o commit esperado da branch `main` e o arquivo `/railway.json`.
 
 As migrations usam um executor próprio em `src/services/migrationService.js`, com o driver `pg`, lock transacional, checksums SHA-256 e histórico em `schema_migrations`. Não há Prisma, Knex ou Sequelize.
 
@@ -174,7 +176,7 @@ Persistência com `timestamptz` e sessões SQL em UTC. Exibição por `Intl.Date
 | `npm run db:local:start` | Inicia/reutiliza PostgreSQL local e aplica migrations |
 | `npm run db:local:stop` | Para PostgreSQL local sem apagar dados |
 | `npm run db:local:status` | Mostra se PostgreSQL local está em execução |
-| `npm start` | Servidor sem watch |
+| `npm start` | Migrations pendentes, validação do banco e servidor sem watch |
 | `npm run db:migrate` | Aplicar migrations |
 | `npm run db:seed` | Empresa Exemplo LTDA e gestor; exige development explícito e senha no ambiente |
 | `npm test` | Testes da fundação, autenticação e isolamento, sem conexão externa |

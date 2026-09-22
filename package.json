@@ -15,7 +15,7 @@
     "db:local:stop": "node scripts/local-db.js stop",
     "db:local:status": "node scripts/local-db.js status",
     "test:postgres": "node scripts/check-postgres.js",
-    "start": "node src/server.js",
+    "start": "npm run db:migrate && npm run db:check && node src/server.js",
     "db:migrate": "node scripts/migrate.js",
     "db:check": "node scripts/check-deploy.js",
     "db:seed": "node scripts/seed.js",
