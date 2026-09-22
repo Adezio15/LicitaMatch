@@ -19,6 +19,7 @@
     "db:migrate": "node scripts/migrate.js",
     "db:check": "node scripts/check-deploy.js",
     "db:seed": "node scripts/seed.js",
+    "admin:create": "node scripts/create-admin.js",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage"
   },

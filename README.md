@@ -46,9 +46,10 @@ O servidor verifica o banco antes de iniciar. Acesse `http://localhost:3000`, qu
 | `LOG_LEVEL` | Nível dos logs JSON; padrão `info` |
 | `TRUST_PROXY_HOPS` | Quantidade de proxies confiáveis; padrão 0, ajustar ao ambiente de deploy |
 | `SESSION_SECRET` | Segredo aleatório de pelo menos 48 caracteres, igual em todas as instâncias |
-| `SEED_USER_ROLE` | Papel do usuário de seed em development; `gestor` ou `admin` |
-| `SEED_USER_EMAIL` | E-mail do usuário fictício; padrão `admin@local.test` quando `SEED_USER_ROLE=admin` |
-| `SEED_USER_PASSWORD` | Senha do seed, sem valor padrão, mínimo 12 caracteres |
+| `SEED_USER_ROLE` | No seed de desenvolvimento: `gestor` ou `admin`; em `admin:create`: obrigatoriamente `admin` |
+| `SEED_USER_EMAIL` | E-mail obrigatório em `admin:create`; no seed de desenvolvimento há um padrão fictício |
+| `SEED_USER_PASSWORD` | Senha obrigatória, sem valor padrão, mínimo 12 caracteres e máximo 72 bytes UTF-8 |
+| `SEED_COMPANY_ID` | ID da empresa ativa existente; obrigatório para criar com `admin:create` |
 
 ### Neon
 
@@ -509,3 +510,59 @@ A etapa 8 foi concluída com o painel agora alimentado por dados reais da empres
 A etapa 9 acrescenta o catálogo de fontes e prepara a extensão para novos portais sem acoplar a aplicação a um único provedor.
 
 PNCP, scraping, envio de e-mail e cron ainda não estão ativos. As dependências específicas serão instaladas nas respectivas etapas. A documentação de cada integração acompanhará sua implementação, incluindo como adicionar um adaptador e os limites de requisição. APIs públicas terão prioridade; nenhuma proteção de portal será contornada.
+
+## Primeiro administrador (produção / Railway)
+
+`npm run admin:create` é um comando operacional independente do seed de desenvolvimento.
+Usa bcrypt custo 12 (a mesma função de hash da autenticação), valida senha com
+12 caracteres no mínimo e 72 bytes UTF-8 no máximo, e nunca registra senha, hash,
+URL de conexão ou erros brutos do PostgreSQL. Não executa migrations nem apaga dados.
+
+O esquema das migrations 001 e 002 exige `usuarios.empresa_id`, `nome`, `email`,
+`senha_hash`, `tipo` e inclui `ativo` e `auth_version`. O perfil é `tipo='admin'`;
+não existe coluna `role`. O índice único usa `lower(trim(email))`. O login exige
+usuário e empresa ativos. Portanto, para um novo administrador, selecione uma
+empresa real existente por `SEED_COMPANY_ID`. Se o banco estiver vazio, cadastre
+primeiro a empresa pelo fluxo público `/cadastro` (que cria um gestor) e use um
+**outro e-mail** para o administrador. O script não cria empresa fictícia nem
+promove contas comuns. Para consultar IDs no editor SQL do Neon:
+
+```sql
+SELECT id, razao_social, status FROM empresas ORDER BY id;
+```
+
+Após publicar esta versão e aplicar as migrations pelo fluxo normal de deploy,
+configure nas Variables do serviço Railway:
+
+- `SEED_USER_EMAIL`: e-mail do administrador.
+- `SEED_USER_PASSWORD`: senha forte, sem aspas adicionais; informe somente nas variáveis, nunca no comando.
+- `SEED_USER_ROLE`: `admin` (obrigatório).
+- `SEED_COMPANY_ID`: ID da empresa ativa (obrigatório apenas para criar).
+- `DATABASE_DIRECT_URL`: URL direta do Neon, preservando os parâmetros TLS fornecidos pelo Neon.
+  Se ausente ou vazia, usa `DATABASE_URL`. Uma URL direta inválida ou inacessível causa
+  erro; não troca silenciosamente de banco. O comando não exige `SESSION_SECRET`.
+
+Aplique as variáveis ao deployment. Abra o shell do serviço correto usando o comando
+“Copy SSH Command” do Railway, ou pela CLI autenticada:
+
+```sh
+railway ssh --project SEU_PROJETO --service SEU_SERVICO --environment production
+npm run admin:create
+```
+
+O segundo comando é executado dentro do container. Referência: [Railway SSH](https://docs.railway.com/cli/ssh).
+Não adicione o cadastro ao Start Command ou ao pre-deploy: execute pontualmente.
+Se já houver administrador com esse e-mail, o comando preserva a senha e não duplica.
+Para trocar a senha, atualize `SEED_USER_PASSWORD` nas Variables, aplique ao deployment,
+abra uma nova conexão SSH e execute:
+
+```sh
+npm run admin:create -- --update-password
+```
+
+Essa opção exige administrador existente, preserva empresa/perfil/status e incrementa
+`auth_version`, invalidando suas sessões anteriores. E-mail de conta não administradora,
+empresa divergente ou conta/empresa inativa causam recusa sem alteração. A operação usa
+transação, consultas parametrizadas, lock por e-mail e o índice único do banco para
+impedir duplicatas. Remova `SEED_USER_PASSWORD` das Variables depois de concluir e
+aplique a remoção. A conta permanece cadastrada.

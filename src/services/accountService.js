@@ -2,10 +2,10 @@ import bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import { HttpError } from '../utils/httpError.js';
 import { accountRepository } from '../repositories/accountRepository.js';
+import { hashPassword } from '../utils/password.js';
 
-const rounds = 12;
 // Mesmo custo de bcrypt para e-mail inexistente, evitando atalho de timing.
-const dummyHash = bcrypt.hash(randomBytes(32).toString('hex'), rounds);
+const dummyHash = hashPassword(randomBytes(32).toString('hex'));
 const invalidLogin = () => new HttpError(401, 'E-mail ou senha inválidos');
 
 export function accountService(database) {
@@ -13,7 +13,7 @@ export function accountService(database) {
   return {
     repository,
     async register(data) {
-      const hash = await bcrypt.hash(data.senha, rounds);
+      const hash = await hashPassword(data.senha);
       return repository.transaction(async transaction => {
         const company = await transaction.createCompany(data);
         const user = await transaction.createUser(company.id, { ...data, tipo: 'gestor' }, hash);
@@ -27,7 +27,7 @@ export function accountService(database) {
       return user;
     },
     async createUser(empresaId, data) {
-      return repository.createUser(empresaId, data, await bcrypt.hash(data.senha, rounds));
+      return repository.createUser(empresaId, data, await hashPassword(data.senha));
     },
     async getDashboard(empresaId) {
       return repository.getDashboard(empresaId);
@@ -52,7 +52,7 @@ export function accountService(database) {
     async changePassword(actor, data) {
       const user = await repository.findLogin(actor.email);
       if (!user || !await bcrypt.compare(data.senha_atual, user.senha_hash)) throw new HttpError(422, 'Senha atual incorreta');
-      const updated = await repository.changePassword(actor.empresa_id, actor.id, user.senha_hash, await bcrypt.hash(data.senha, rounds));
+      const updated = await repository.changePassword(actor.empresa_id, actor.id, user.senha_hash, await hashPassword(data.senha));
       if (!updated) throw new HttpError(409, 'Sua senha foi alterada em outra sessão. Entre novamente.');
     }
   };

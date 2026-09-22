@@ -14,7 +14,7 @@ export function loadEnvironment(logger) {
 }
 
 const invalid = (ctx, reason) => ctx.addIssue({ code: 'custom', message: reason });
-const postgresUrl = z.string().superRefine((value, ctx) => {
+export const postgresUrl = z.string().superRefine((value, ctx) => {
   if (!value) return invalid(ctx, 'EMPTY');
   if (value !== value.trim()) return invalid(ctx, 'SURROUNDING_WHITESPACE');
   if (/^(?:psql\b|(?:export\s+)?DATABASE(?:_DIRECT)?_URL\s*=)/i.test(value)) return invalid(ctx, 'COMMAND_INSTEAD_OF_URL');

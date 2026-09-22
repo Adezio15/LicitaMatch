@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import { hashPassword } from '../utils/password.js';
 import { validate, registerSchema } from '../utils/validation.js';
 
 const validRoles = new Set(['gestor', 'admin']);
@@ -27,7 +27,7 @@ export async function seedDevelopment(database, env) {
       (razao_social, nome_fantasia, cnpj, email, telefone, cidade, estado)
       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [data.razao_social, data.nome_fantasia, data.cnpj, data.email_empresa, data.telefone, data.cidade, data.estado || null]);
-    const hash = await bcrypt.hash(data.senha, 12);
+    const hash = await hashPassword(data.senha);
     await client.query(`INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo)
       VALUES ($1,$2,$3,$4,$5)`,
     [company.rows[0].id, data.nome, data.email, hash, role]);
