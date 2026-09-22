@@ -53,7 +53,7 @@ test('migrations: SQL PostgreSQL, constraints, idempotência, checksum e rollbac
   // PGlite é single-process e não implementa advisory locks. Só esse comando é substituído.
   const client = { query: async (sql, params) => {
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
-    if (sql.includes('CREATE TABLE')) return db.exec(sql);
+    if (sql.includes('CREATE TABLE') || sql.startsWith('ALTER TABLE')) return db.exec(sql);
     return db.query(sql, params);
   } };
   try {

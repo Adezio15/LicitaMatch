@@ -1,0 +1,29 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page">
+  <header class="page-heading"><span class="eyebrow">MONITORAMENTO</span><h1>Interesses da empresa</h1><p>Defina o que sua empresa fornece para encontrar compras relacionadas.</p></header>
+  <% if (saved) { %><p class="panel" role="status">Interesse salvo. As oportunidades serão atualizadas no próximo processamento.</p><% } %>
+  <% const manager = ['gestor','admin'].includes(user.tipo); %>
+  <% if (manager) { %>
+  <section class="panel"><h2>Novo interesse</h2>
+    <form method="post" action="/interesses" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>Nome do interesse<input name="titulo" required minlength="3" maxlength="150" placeholder="Equipamentos de informática"></label>
+      <label>Palavras-chave, separadas por vírgulas<input name="palavras" required maxlength="2000" placeholder="computador, notebook, impressora"></label>
+      <small>Use até 30 termos, com pelo menos 3 caracteres cada.</small><button class="button" type="submit">Cadastrar interesse</button>
+    </form>
+  </section><% } %>
+  <section class="section-gap"><h2>Interesses cadastrados</h2>
+  <% if (!interests.length) { %><p class="panel">Nenhum interesse cadastrado. <%= manager ? 'Adicione o primeiro interesse acima.' : 'Peça ao gestor para cadastrar os produtos e serviços da empresa.' %></p><% } %>
+  <% for (const interest of interests) { %>
+    <article class="panel section-gap">
+      <% if (manager) { %><form method="post" action="/interesses/<%= interest.id %>" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Nome<input name="titulo" required minlength="3" maxlength="150" value="<%= interest.titulo %>"></label>
+        <label>Palavras-chave<input name="palavras" required maxlength="2000" value="<%= interest.palavras.join(', ') %>"></label>
+        <label>Monitoramento<select name="ativo"><option value="true" <%= interest.ativo ? 'selected' : '' %>>Ativo</option><option value="false" <%= !interest.ativo ? 'selected' : '' %>>Pausado</option></select></label>
+        <button class="button secondary" type="submit">Salvar alterações</button>
+      </form><% } else { %><h3><%= interest.titulo %></h3><p><%= interest.palavras.join(', ') %></p><span class="badge"><%= interest.ativo ? 'Ativo' : 'Pausado' %></span><% } %>
+    </article>
+  <% } %></section>
+</main><%- include('../partials/footer') %>

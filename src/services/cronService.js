@@ -41,10 +41,16 @@ export function createCronService({ now = () => Date.now() } = {}) {
       const entries = [...jobs.values()].filter(job => job.enabled && job.nextRunAt <= referenceTime);
 
       for (const job of entries) {
-        const value = await job.run({ job: job.name, at: referenceTime });
+        if (job.running || job.nextRunAt > referenceTime) continue;
+        job.running = true;
         const nextRunAt = Number(reflectionValue(job, referenceTime));
         job.nextRunAt = nextRunAt;
-        results.push({ name: job.name, result: value, nextRunAt: job.nextRunAt });
+        try {
+          const value = await job.run({ job: job.name, at: referenceTime });
+          results.push({ name: job.name, result: value, nextRunAt: job.nextRunAt });
+        } catch (error) {
+          results.push({ name: job.name, error, nextRunAt: job.nextRunAt });
+        } finally { job.running = false; }
       }
 
       return results;

@@ -1,0 +1,16 @@
+<%- include('../partials/head') %><%- include('../partials/nav') %>
+<main class="page"><header class="page-heading"><span class="eyebrow">ADMINISTRAÇÃO</span><h1>Operação e fontes</h1><p>Acompanhe a coleta de licitações, a correlação e os alertas.</p></header>
+<% if (scheduled) { %><p class="panel" role="status">Processamento agendado para o próximo ciclo.</p><% } %>
+<section class="panel"><h2>Processamento <%= data.workerEnabled ? 'ativo' : 'desativado' %></h2>
+<p>E-mail: <%= data.emailEnabled ? 'configurado' : 'desativado' %>. Os alertas exigem a adesão de cada usuário.</p>
+<p>WhatsApp: <%= data.whatsappEnabled ? 'configurado' : 'desativado' %>. Disponível aos responsáveis que ativarem o recebimento na própria conta.</p>
+<% if (data.workerEnabled) { %><form method="post" action="/admin/operacao/sincronizar"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="button">Atualizar fontes e oportunidades</button></form><% } %>
+</section>
+<section class="panel section-gap"><h2>Fontes</h2><% for (const source of data.sources) { %><p><strong><%= source.name %></strong> — <%= source.enabled ? 'Ativa' : 'Desativada' %></p><% } %></section>
+<section class="panel section-gap"><h2>Últimas execuções</h2>
+<% const format = value => value ? new Date(value).toLocaleString('pt-BR',{timeZone:'America/Fortaleza'}) : 'Ainda não executado'; const states = { aguardando:'Aguardando',executando:'Em execução',concluido:'Concluído',parcial:'Concluído com falhas de envio',falhou:'Falhou — consulte os logs do servidor' }; %>
+<% if (!data.tasks.length) { %><p>Nenhuma execução registrada.</p><% } else { %><div class="table-wrap"><table><thead><tr><th>Tarefa</th><th>Situação</th><th>Último sucesso</th><th>Próxima execução</th><th>Resultado</th></tr></thead><tbody>
+<% for (const task of data.tasks) { %><tr><td><%= task.nome %></td><td><%= states[task.estado] || task.estado %></td><td><%= format(task.ultimo_sucesso) %></td><td><%= format(task.proxima_execucao) %></td><td><% if (task.resumo.inserted !== undefined) { %><%= task.resumo.inserted %> importações em <%= task.resumo.pages %> páginas<% } else if (task.resumo.matches !== undefined) { %><%= task.resumo.matches %> correlações atualizadas<% } else if (task.resumo.sent !== undefined) { %><%= task.resumo.sent %> enviados; <%= task.resumo.failed %> falhas<% } %><% if (task.cursor.page) { %> · Continua na página <%= task.cursor.page %><% } %></td></tr><% } %>
+</tbody></table></div><% } %></section>
+<section class="panel section-gap"><h2>Fila de alertas</h2><p class="muted">“Enviado” indica aceitação pelo provedor, não confirmação de entrega ou leitura.</p><% if (!data.alerts.length) { %><p>Nenhum alerta na fila.</p><% } %><% for (const item of data.alerts) { %><p><%= item.canal==='whatsapp' ? 'WhatsApp' : 'E-mail' %> — <%= item.status %>: <%= item.total %></p><% } %></section>
+</main><%- include('../partials/footer') %>

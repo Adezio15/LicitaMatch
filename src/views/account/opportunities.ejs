@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page">
+  <header class="page-heading"><span class="eyebrow">LICITAÇÕES</span><h1>Oportunidades</h1><p>Revise as compras relacionadas aos interesses ativos da sua empresa.</p></header>
+  <% const labels = { novo: 'Nova', revisado: 'Revisada', aceito: 'Aceita', recusado: 'Recusada' }; %>
+  <form method="get" class="panel grid two">
+    <label>Buscar no objeto<input name="q" maxlength="150" value="<%= filters.q %>"></label>
+    <label>Situação<select name="status"><option value="">Todas</option><% for (const [value,label] of Object.entries(labels)) { %><option value="<%= value %>" <%= filters.status===value ? 'selected' : '' %>><%= label %></option><% } %></select></label>
+    <label>Correlação mínima (%)<input type="number" name="score" min="0" max="100" value="<%= filters.score %>"></label><button class="button" type="submit">Filtrar oportunidades</button>
+  </form>
+  <p><%= total %> resultado(s)</p>
+  <% if (!items.length) { %><section class="panel"><h2>Nenhuma oportunidade encontrada</h2><p>Revise os filtros e os <a href="/interesses">interesses da empresa</a>. Novas compras aparecem após o processamento das fontes.</p></section><% } %>
+  <% for (const item of items) { %>
+    <article class="panel section-gap"><div class="panel-header"><strong><%= item.score %>% de correlação</strong><span class="badge"><%= labels[item.status] %></span></div>
+      <h2><%= item.objeto %></h2><p><strong><%= item.unidade_gestora %></strong> · <%= item.modalidade %></p>
+      <p>Interesse: <%= item.interesse_titulo %> · Fonte: <%= item.origem %></p>
+      <p>Data informada pela fonte: <%= new Date(item.data_abertura).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) %></p>
+      <% const pncpId = /^(\d{14})-1-(\d+)-(\d{4})$/.exec(item.codigo_externo); if (pncpId) { %><p><a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/editais/<%= pncpId[1] %>/<%= pncpId[3] %>/<%= Number(pncpId[2]) %>">Consultar edital no PNCP</a></p><% } %>
+      <% if (['gestor','admin'].includes(user.tipo)) { %><form method="post" action="/oportunidades/<%= item.match_id %>" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>"><label>Situação<select name="status"><% for (const [value,label] of Object.entries(labels)) { %><option value="<%= value %>" <%= item.status===value ? 'selected' : '' %>><%= label %></option><% } %></select></label><button type="submit" class="button secondary">Atualizar situação</button>
+      </form><% } %>
+    </article>
+  <% } %>
+  <nav aria-label="Paginação" class="section-gap"><% if (filters.page>1) { %><a class="button secondary" href="?page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Anterior</a><% } %> <span>Página <%= filters.page %> de <%= pages %></span> <% if (filters.page<pages) { %><a class="button secondary" href="?page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Próxima</a><% } %></nav>
+</main><%- include('../partials/footer') %>

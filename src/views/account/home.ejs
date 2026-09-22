@@ -7,6 +7,8 @@
     </div>
     <nav class="sidebar-nav" aria-label="Navegação principal">
       <a class="nav-link active" href="/conta">Dashboard</a>
+      <a class="nav-link" href="/interesses">Interesses</a>
+      <a class="nav-link" href="/oportunidades">Oportunidades</a>
       <a class="nav-link" href="/empresa">Empresa</a>
       <% if (['gestor', 'admin'].includes(user.tipo)) { %><a class="nav-link" href="/usuarios">Usuários</a><% } %>
       <% if (user.tipo === 'admin') { %><a class="nav-link" href="/admin">Admin</a><% } %>
@@ -53,7 +55,7 @@
 
     <div class="grid two dashboard-panels">
       <section class="panel">
-        <h2>Oportunidades prioritárias</h2>
+        <h2>Oportunidades prioritárias</h2><p><a href="/oportunidades">Ver todas as oportunidades</a></p>
         <% if (dashboard?.topMatches?.length) { %>
           <ul class="check-list">
             <% for (const match of dashboard.topMatches) { %>
@@ -86,7 +88,7 @@
         <% const permissions = {
           usuario: ['Consultar a própria empresa', 'Visualizar dados do seu acesso', 'Não alterar cadastros da organização'],
           gestor: ['Editar dados da empresa', 'Gerenciar usuários da própria empresa', 'Criar e atualizar acessos do time'],
-          admin: ['Acesso administrativo da empresa', 'Gerenciar permissões internas da conta', 'Acesso reservado para administração futura']
+          admin: ['Acesso administrativo da empresa', 'Gerenciar permissões internas da conta', 'Supervisionar empresas e processamento das fontes']
         }[user.tipo]; %>
         <% for (const permission of permissions) { %>
           <li><span class="dot ok"></span><%= permission %></li>
@@ -95,17 +97,31 @@
     </section>
 
     <section class="panel section-gap">
-      <h2>Próximos passos da plataforma</h2>
-      <div class="roadmap">
-        <div class="roadmap-item done"><span>1</span><div><strong>Fundação</strong><p>Autenticação, empresas e permissões concluídas.</p></div></div>
-        <div class="roadmap-item done"><span>2</span><div><strong>Layout e dashboard</strong><p>Estrutura inicial do painel e navegação lateral.</p></div></div>
-        <div class="roadmap-item done"><span>3</span><div><strong>Perfis e regras</strong><p>Visibilidade por tipo de acesso e políticas de permissão.</p></div></div>
-        <div class="roadmap-item done"><span>4</span><div><strong>PNCP isolado</strong><p>Adaptador e teste de integração sem depender da internet.</p></div></div>
-        <div class="roadmap-item done"><span>5</span><div><strong>Persistência</strong><p>Armazenamento dos itens PNCP no banco com deduplicação.</p></div></div>
-        <div class="roadmap-item active"><span>6</span><div><strong>Matches</strong><p>Correlação entre interesses da empresa e oportunidades de compra.</p></div></div>
-        <div class="roadmap-item"><span>7</span><div><strong>Dashboard real</strong><p>Visão operacional alimentada por licitações e matches do banco.</p></div></div>
-      </div>
+      <h2>Monitorar novas compras</h2><p>Cadastre os produtos e serviços da empresa para acompanhar oportunidades relacionadas ao seu negócio.</p>
+      <a class="button" href="/interesses">Gerenciar interesses</a>
     </section>
+    <section class="panel section-gap" id="alertas"><h2>Alertas por e-mail</h2>
+      <% if (alertsSaved) { %><p class="notice" role="status">Preferência de alertas salva.</p><% } %>
+      <p><%= emailEnabled ? 'Receba oportunidades com alta correlação no e-mail da sua conta.' : 'O envio de e-mails ainda não foi configurado pelo administrador. Você pode salvar sua preferência.' %></p>
+      <form method="post" action="/conta/alertas" class="stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Receber alertas<select name="alertas_email"><option value="false" <%= !user.alertas_email ? 'selected' : '' %>>Não receber</option><option value="true" <%= user.alertas_email ? 'selected' : '' %>>Receber no meu e-mail</option></select></label><button type="submit" class="button secondary">Salvar preferência</button>
+      </form>
+    </section>
+    <% if (['gestor','admin'].includes(user.tipo)) { %>
+    <section class="panel section-gap" id="whatsapp"><h2>Alertas pelo WhatsApp</h2>
+      <% if (alertsSaved) { %><p class="notice" role="status">Preferências de alertas atualizadas.</p><% } %>
+      <p>Como responsável pela empresa, você pode receber no WhatsApp os mesmos resumos de oportunidades enviados por e-mail.</p>
+      <% if (!whatsappEnabled) { %><p class="muted">O envio ainda não foi configurado pelo administrador. Você pode salvar seu número e sua preferência.</p><% } %>
+      <form method="post" action="/conta/whatsapp" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Seu celular com DDD<input type="tel" name="whatsapp_numero" autocomplete="tel" maxlength="30" placeholder="(84) 99999-9999" value="<%= user.whatsapp_numero || '' %>"></label>
+        <label>Receber oportunidades no WhatsApp<select name="alertas_whatsapp"><option value="false" <%= !user.alertas_whatsapp ? 'selected' : '' %>>Não receber</option><option value="true" <%= user.alertas_whatsapp ? 'selected' : '' %>>Receber no WhatsApp</option></select></label>
+        <label class="checkbox"><input type="checkbox" name="confirmar_whatsapp">Confirmo que este número é meu e quero receber alertas de oportunidades do LicitaMatch pelo WhatsApp.</label>
+        <small class="muted">Confirme para ativar ou atualizar o recebimento. Para cancelar, escolha “Não receber” e salve. A preferência de e-mail é independente.</small>
+        <button type="submit" class="button secondary">Salvar WhatsApp</button>
+      </form>
+    </section>
+    <% } %>
   </main>
 </div>
 <%- include('../partials/footer') %>

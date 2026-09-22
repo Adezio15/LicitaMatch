@@ -1,6 +1,8 @@
 # LicitaMatch
 
-SaaS para monitoramento de licitações públicas brasileiras. **Etapas 1 e 2: fundação, autenticação, empresas e usuários**. Este repositório foi criado do zero; não havia outros projetos disponíveis no workspace para reaproveitar padrões.
+SaaS para monitoramento de licitações públicas brasileiras, com contas por empresa, interesses, oportunidades, painel administrativo e processamento periódico.
+
+**Estado da entrega:** os fluxos das etapas 1 a 14 estão integrados. A revisão, os testes e as dependências externas estão detalhados em [docs/ENTREGA.md](docs/ENTREGA.md). A publicação no Railway e a entrega real de e-mails dependem da configuração do ambiente de produção. As seções “Parte” abaixo preservam os critérios originais; consulte o relatório de entrega para o estado atual.
 
 ## Requisitos e instalação
 
@@ -29,7 +31,7 @@ npm run db:migrate
 npm run dev
 ```
 
-O servidor verifica o banco antes de iniciar. Acesse `http://localhost:3000`, que abre o login. Em **Cadastre sua empresa**, crie a empresa e o primeiro gestor. Empresa e usuário são gravados na mesma transação; não há empresa órfã caso o e-mail já exista. O dashboard e a sidebar ficam para a etapa 3.
+O servidor verifica o banco antes de iniciar. Acesse `http://localhost:3000`, que abre o login. Em **Cadastre sua empresa**, crie a empresa e o primeiro gestor. Empresa e usuário são gravados na mesma transação; não há empresa órfã caso o e-mail já exista. Após entrar, cadastre os interesses da empresa e acompanhe os resultados em **Oportunidades**.
 
 ## Ambiente
 
@@ -102,10 +104,12 @@ As migrations usam um executor próprio em `src/services/migrationService.js`, c
 | `002_auth_sessions.sql` | Cria `sessoes` e adiciona `usuarios.auth_version` |
 | `003_pncp_persistence.sql` | Cria `licitacoes_pncp` |
 | `004_matches.sql` | Cria `interesses` e `matches` |
+| `005_operations.sql` | Adiciona preferências, assinatura e índices; cria `tarefas` e `alertas` |
+| `006_whatsapp_alerts.sql` | Adiciona preferências de WhatsApp e controle de entrega por canal |
 
-O executor cria também `schema_migrations`; portanto, são sete tabelas obrigatórias. Os arquivos atuais adicionam tabelas, coluna, índices, funções e triggers, sem remoção de dados. Migrations registradas com checksum correspondente não são reaplicadas. O log `applied` informa exatamente quais foram confirmadas; `tablesBefore` e `tablesAfter` mostram as tabelas obrigatórias presentes antes e depois. Havendo execução concorrente, outra instância também pode ter criado tabelas entre essas verificações.
+O executor cria também `schema_migrations`; portanto, são nove tabelas obrigatórias. Os arquivos atuais adicionam tabelas, coluna, índices, funções e triggers, sem remoção de dados. Migrations registradas com checksum correspondente não são reaplicadas. O log `applied` informa exatamente quais foram confirmadas; `tablesBefore` e `tablesAfter` mostram as tabelas obrigatórias presentes antes e depois. Havendo execução concorrente, outra instância também pode ter criado tabelas entre essas verificações.
 
-Se o histórico disser que uma migration foi aplicada mas sua tabela estiver ausente, o diagnóstico falha: não apague registros do histórico nem recrie tabelas manualmente para contornar o erro. Se uma tabela já existir sem histórico, a migration pode falhar e a transação será revertida, preservando o estado anterior. Nesse caso, compare o schema existente antes de preparar uma correção específica. Um banco novo exige as quatro migrations; um banco parcialmente migrado recebe somente as pendentes.
+Se o histórico disser que uma migration foi aplicada mas sua tabela estiver ausente, o diagnóstico falha: não apague registros do histórico nem recrie tabelas manualmente para contornar o erro. Se uma tabela já existir sem histórico, a migration pode falhar e a transação será revertida, preservando o estado anterior. Nesse caso, compare o schema existente antes de preparar uma correção específica. Um banco novo exige as seis migrations; um banco parcialmente migrado recebe somente as pendentes.
 
 1. Conecte o repositório e use a raiz do projeto como Root Directory. O projeto não precisa de `npm run build`; remova esse comando caso tenha sido configurado manualmente.
 2. Nas Variables do serviço da aplicação, configure as variáveis de `.env.production.example` com valores reais. Os arquivos `.env.*.example` não são carregados pelo deploy. `SESSION_SECRET` precisa ter pelo menos 48 caracteres e não pode ser o texto de exemplo. Gere um valor com `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"`.
@@ -119,7 +123,7 @@ Durante a investigação do deploy, cada comando emite temporariamente apenas `D
 
 Se aparecer `INVALID_ENV` em `error.code`, o campo `fields` no log lista as variáveis ausentes ou inválidas sem mostrar seus valores. Erros de conexão como `ECONNREFUSED` ou `ENOTFOUND` exigem conferir o endereço e a disponibilidade do banco. A inicialização valida `SELECT 1`, tabelas e checksums das migrations antes de abrir a porta; `DATABASE_SCHEMA_MISMATCH` indica schema incompleto ou divergente. `/health/ready` continua verificando a conexão após a inicialização.
 
-Para investigar um Crash, execute `npm run db:check` no ambiente do serviço com suas variáveis configuradas. O comando usa apenas consultas de leitura: testa `DATABASE_URL` e, quando presente, `DATABASE_DIRECT_URL`, verifica as sete tabelas e as quatro migrations. Não cria tabelas, não aplica migrations e não lê dados de clientes. A URL direta é opcional; se fornecida, deve ser válida e apontar ao mesmo banco/branch Neon da URL da aplicação. Verifique isso no painel Neon: schemas iguais, por si só, não provam que duas URLs apontam ao mesmo banco.
+Para investigar um Crash, execute `npm run db:check` no ambiente do serviço com suas variáveis configuradas. O comando usa apenas consultas de leitura: testa `DATABASE_URL` e, quando presente, `DATABASE_DIRECT_URL`, verifica as nove tabelas e as seis migrations. Não cria tabelas, não aplica migrations e não lê dados de clientes. A URL direta é opcional; se fornecida, deve ser válida e apontar ao mesmo banco/branch Neon da URL da aplicação. Verifique isso no painel Neon: schemas iguais, por si só, não provam que duas URLs apontam ao mesmo banco.
 
 Os logs de falha incluem `stage` e `error.name`, `error.message`, `error.code`, `error.stack`, com remoção de URLs PostgreSQL, credenciais e valores secretos do ambiente. Não envie o `.env` nem URLs de conexão para suporte; compartilhe apenas o diagnóstico sanitizado. As etapas `environment`, `database_connection`, `database_schema`, `application` e `http_listen` indicam onde a inicialização parou. Não desative a verificação TLS para contornar erros de certificado. O aviso `npm warn config production Use --omit=dev instead` não é a causa de Crash.
 
@@ -504,14 +508,16 @@ A camada fica em `src/services/cronService.js` e oferece:
 
 A base aceita `PORT` do ambiente, logs em stdout e encerramento por `SIGTERM`. O `railway.json` configura migrations antes da liberação, comando `npm start`, healthcheck e reinicialização. Nenhum serviço remoto foi provisionado ou publicado nesta preparação; ainda é necessário configurar variáveis, banco, proxy e domínio e validar o deploy real conforme as instruções acima.
 
-Sequência restante: 3 layout/sidebar/dashboard; 4 perfis; 5 teste isolado PNCP; 6 persistência; 7 matches; 8 dashboard real; 9 fontes; 10 primeiro portal complementar validado; 11 deduplicação; 12 e-mail; 13 cron; 14 admin; 15 testes finais; 16 deploy.
+As etapas 3 a 14 possuem implementação e integração com a aplicação. A etapa 15 inclui os testes automatizados e o teste com PostgreSQL real. A etapa 16 tem configuração de deploy pronta, mas exige publicação e validação no ambiente remoto.
 
 A etapa 8 foi concluída com o painel agora alimentado por dados reais da empresa autenticada.
 A etapa 9 acrescenta o catálogo de fontes e prepara a extensão para novos portais sem acoplar a aplicação a um único provedor.
 
-PNCP, scraping, envio de e-mail e cron ainda não estão ativos. As dependências específicas serão instaladas nas respectivas etapas. A documentação de cada integração acompanhará sua implementação, incluindo como adicionar um adaptador e os limites de requisição. APIs públicas terão prioridade; nenhuma proteção de portal será contornada.
+O worker inicia com o servidor quando `WORKER_ENABLED=true`. A coleta PNCP usa `SYNC_ENABLED`; a fonte Compras.gov.br usa também `COMPRASNET_ENABLED`. E-mails exigem `EMAIL_ENABLED=true`, SMTP configurado e adesão do usuário. O monitoramento usa APIs públicas, sem scraping. Consulte [operação e limitações](docs/ENTREGA.md) antes de ativar no ambiente remoto.
 
 ## Primeiro administrador (produção / Railway)
+
+Os responsáveis também podem ativar alertas por WhatsApp em **Minha conta**. Consulte [configuração do WhatsApp](docs/WHATSAPP.md) para variáveis da API oficial, template e funcionamento da fila independente de e-mail.
 
 `npm run admin:create` é um comando operacional independente do seed de desenvolvimento.
 Usa bcrypt custo 12 (a mesma função de hash da autenticação), valida senha com

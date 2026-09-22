@@ -52,7 +52,7 @@ export function accountController(service, config) {
     me(req, res) { res.json({ user: safeUser(req.user) }); },
     async accountPage(req, res) {
       const dashboard = await service.getDashboard(req.user.empresa_id);
-      res.render('account/home', { title: 'Minha conta', dashboard });
+      res.render('account/home', { title: 'Minha conta', dashboard, emailEnabled: config.EMAIL_ENABLED === 'true', whatsappEnabled: config.WHATSAPP_ENABLED === 'true', alertsSaved: req.query.alertas === 'salvos' });
     },
     async adminDashboard(req, res) {
       const data = await service.getAdminOverview();

@@ -33,7 +33,8 @@ test('normalizeComprasnetItems extrai itens válidos do portal complementar', ()
 test('createComprasnetSource consulta o portal complementar e rejeita falhas de rede', async () => {
   const okSource = createComprasnetSource({
     fetchImpl: async (url, init = {}) => {
-      assert.match(String(url), /comprasnet/i);
+      assert.equal(url.hostname, 'dadosabertos.compras.gov.br');
+      assert.equal(url.searchParams.get('pagina'), '2');
       assert.equal(init.method || 'GET', 'GET');
       return {
         ok: true,

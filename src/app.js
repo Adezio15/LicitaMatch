@@ -7,8 +7,9 @@ import { createRoutes } from './routes/index.js';
 import { accountRoutes } from './routes/accountRoutes.js';
 import { createSession } from './config/session.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { createOperationsService } from './services/operationsService.js';
 
-export function createApp({ config, database, logger }) {
+export function createApp({ config, database, logger, operationsDatabase = database }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.TRUST_PROXY_HOPS);
@@ -31,6 +32,7 @@ export function createApp({ config, database, logger }) {
   app.use('/assets', express.static(fileURLToPath(new URL('./public', import.meta.url))));
   const sessions = createSession({ config, database, logger });
   app.locals.sessionStore = sessions.store;
+  app.locals.operations = createOperationsService({ database: operationsDatabase, config, logger });
   app.use(sessions.middleware);
   app.use(accountRoutes(database, config));
   app.use((_req, res) => res.status(404).json({ error: 'Página não encontrada' }));

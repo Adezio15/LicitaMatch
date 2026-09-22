@@ -4,6 +4,7 @@ import { accountService } from '../services/accountService.js';
 import { accountController } from '../controllers/accountController.js';
 import { loadUser, requireAuth, requireManager, requireAdmin } from '../middlewares/auth.js';
 import { csrf } from '../middlewares/csrf.js';
+import { opportunityRoutes } from './opportunityRoutes.js';
 
 export function accountRoutes(database, config) {
   const router = Router();
@@ -16,6 +17,7 @@ export function accountRoutes(database, config) {
 
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(loadUser(service.repository, config), csrf);
+  router.use(opportunityRoutes(database));
   router.get('/', (req, res) => res.redirect(req.user ? '/conta' : '/login'));
   router.get('/login', controller.loginPage);
   router.get('/cadastro', controller.registerPage);
@@ -25,6 +27,13 @@ export function accountRoutes(database, config) {
   router.post(['/logout', '/api/auth/logout'], requireAuth, controller.logout);
   router.get('/api/auth/me', requireAuth, controller.me);
   router.get('/admin', requireAuth, requireAdmin, controller.adminDashboard);
+  router.get('/admin/operacao', requireAuth, requireAdmin, async (req,res) => {
+    res.render('account/operations', { title: 'Operação', data: await req.app.locals.operations.overview(), scheduled: req.query.agendado === '1' });
+  });
+  router.post('/admin/operacao/sincronizar', requireAuth, requireAdmin, async (req,res) => {
+    await req.app.locals.operations.schedule();
+    res.redirect(303,'/admin/operacao?agendado=1');
+  });
   router.get('/api/admin/empresas', requireAuth, requireAdmin, controller.adminEmpresas);
   router.get('/conta', requireAuth, controller.accountPage);
   router.post(['/conta/senha', '/api/auth/password'], requireAuth, loginLimit, controller.changePassword);

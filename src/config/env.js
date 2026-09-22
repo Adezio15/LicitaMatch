@@ -42,11 +42,46 @@ const schema = z.object({
   APP_TIMEZONE: z.literal('America/Fortaleza').default('America/Fortaleza'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+  WORKER_ENABLED: z.enum(['true','false']).default('true'),
+  SYNC_ENABLED: z.enum(['true','false']).default('true'),
+  COMPRASNET_ENABLED: z.enum(['true','false']).default('false'),
+  SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
+  SYNC_LOOKBACK_DAYS: z.coerce.number().int().min(1).max(30).default(2),
+  SYNC_MAX_PAGES: z.coerce.number().int().min(1).max(100).default(5),
+  PNCP_MODALIDADES: z.string().regex(/^\d+(,\d+)*$/).default('4,6,7,8,9,12'),
+  COMPRASNET_MODALIDADES: z.string().regex(/^\d+(,\d+)*$/).default('3,5,6,7'),
+  EMAIL_ENABLED: z.enum(['true','false']).default('false'),
+  WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
+  WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1).optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).optional(),
+  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.0$/).optional(),
+  WHATSAPP_TEMPLATE_NAME: z.string().regex(/^[a-z0-9_]+$/).optional(),
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().regex(/^[a-z]{2}(?:_[A-Z]{2})?$/).default('pt_BR'),
+  EMAIL_FROM: z.string().email().optional(),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  ALERT_MIN_SCORE: z.coerce.number().int().min(1).max(100).default(70),
   DATABASE_URL: postgresUrl,
   SESSION_SECRET: sessionSecret,
   DATABASE_DIRECT_URL: z.preprocess(value => value === '' ? undefined : value, postgresUrl.optional()),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
   DATABASE_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(100).max(60000).default(10000)
+}).superRefine((config,ctx) => {
+  if (config.WORKER_ENABLED === 'true' && postgresUrl.safeParse(config.DATABASE_URL).success) {
+    const pooled = value => new URL(value).hostname.includes('-pooler.');
+    if ((pooled(config.DATABASE_URL) && !config.DATABASE_DIRECT_URL) ||
+        (config.DATABASE_DIRECT_URL && postgresUrl.safeParse(config.DATABASE_DIRECT_URL).success && pooled(config.DATABASE_DIRECT_URL))) {
+      ctx.addIssue({code:'custom',path:['DATABASE_DIRECT_URL'],message:'WORKER_REQUIRES_DIRECT_CONNECTION'});
+    }
+  }
+  if (config.EMAIL_ENABLED === 'true') for (const field of ['EMAIL_FROM','SMTP_HOST','SMTP_USER','SMTP_PASSWORD']) {
+    if (!config[field]) ctx.addIssue({ code: 'custom', path: [field], message: 'MISSING' });
+  }
+  if (config.WHATSAPP_ENABLED === 'true') for (const field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) {
+    if (!config[field]) ctx.addIssue({code:'custom',path:[field],message:'MISSING'});
+  }
 }).refine(config => config.NODE_ENV !== 'production' || config.LOCAL_DATABASE === 'false', {
   path: ['LOCAL_DATABASE'], message: 'Banco local não pode ser ativado em produção'
 });

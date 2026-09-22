@@ -6,13 +6,15 @@ import { checkDatabase } from './services/databaseCheckService.js';
 
 const logger = createLogger();
 let database;
+let operationsDatabase;
 let app;
 let stage = 'environment';
 async function closeResources() {
-  for (const resource of [app?.locals.sessionStore, database]) {
+  await app?.locals.operations?.stop();
+  for (const resource of [app?.locals.sessionStore, operationsDatabase !== database ? operationsDatabase : null, database]) {
     if (!resource) continue;
     try {
-      if (resource === database) await resource.end();
+      if (resource === database || resource === operationsDatabase) await resource.end();
       else await resource.close();
     } catch (error) {
       if (logger.level === 'silent') logger.level = 'fatal';
@@ -33,10 +35,13 @@ try {
   logger.info(await checkDatabase(database), 'Tabelas e migrations verificadas');
   stage = 'application';
   const { createApp } = await import('./app.js');
-  app = createApp({ config, database, logger });
+  operationsDatabase = config.DATABASE_DIRECT_URL
+    ? createDatabase({ ...config, DATABASE_URL: config.DATABASE_DIRECT_URL, DATABASE_POOL_MAX: 2 },logger) : database;
+  app = createApp({ config, database, operationsDatabase, logger });
   stage = 'http_listen';
   const server = app.listen(config.PORT, '0.0.0.0', () => {
     logger.info({ port: config.PORT, timezone: config.APP_TIMEZONE }, 'LicitaMatch iniciado');
+    app.locals.operations.start();
   });
   let stopping = false;
   const shutdown = () => {

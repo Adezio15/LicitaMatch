@@ -9,6 +9,8 @@ import { root, localEnvironment, assertLocalTarget } from './lib/localPostgres.j
 import { readMigrations, runMigrations } from '../src/services/migrationService.js';
 import { createApp } from '../src/app.js';
 import { createLogger } from '../src/utils/logger.js';
+import { createOperationsService } from '../src/services/operationsService.js';
+import { createSourceRegistry } from '../src/services/sources/sourceRegistry.js';
 
 const logger = createLogger();
 let admin, pool, app, testDatabase;
@@ -32,6 +34,14 @@ try {
     assert.equal(results.filter(result => result.length === 0).length, 1);
   } finally { first.release(); second.release(); }
   const role = await pool.query('SELECT rolsuper,rolcreatedb FROM pg_roles WHERE rolname=current_user');
+  const lockClient = await pool.connect();
+  const operations = createOperationsService({ database: pool, config: {}, logger, registry: createSourceRegistry() });
+  try {
+    await lockClient.query('SELECT pg_advisory_lock(742193811)');
+    assert.equal((await operations.runOnce()).skipped,true);
+    await lockClient.query('SELECT pg_advisory_unlock(742193811)');
+    assert.equal((await operations.runOnce()).results[0].name,'matches');
+  } finally { await lockClient.query('SELECT pg_advisory_unlock_all()'); lockClient.release(); await operations.stop(); }
   assert.equal(role.rows[0].rolsuper, false);
   assert.equal(role.rows[0].rolcreatedb, false);
   app = createApp({ config: { NODE_ENV: 'test', TRUST_PROXY_HOPS: 0, SESSION_SECRET: randomBytes(48).toString('hex') }, database: pool, logger: createLogger('silent') });

@@ -44,6 +44,7 @@ export function createSourceRegistry(initialSources = {}) {
     },
     async fetch(id, query = {}) {
       const source = this.getSource(id);
+      if (!source.enabled) throw new Error(`Fonte "${id}" desabilitada.`);
       return source.fetchLatest(query);
     }
   };

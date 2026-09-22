@@ -2,6 +2,8 @@
   <a class="brand" href="/conta"><span class="brand-mark">L</span> Licita<span>Match</span></a>
   <nav aria-label="Navegação da conta">
     <a href="/conta">Minha conta</a>
+    <a href="/interesses">Interesses</a>
+    <a href="/oportunidades">Oportunidades</a>
     <a href="/empresa">Empresa</a>
     <% if (['gestor', 'admin'].includes(user.tipo)) { %><a href="/usuarios">Usuários</a><% } %>
     <% if (user.tipo === 'admin') { %><a href="/admin">Admin</a><% } %>

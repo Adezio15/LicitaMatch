@@ -23,7 +23,7 @@ test('npm start migra e valida antes do servidor; falhas interrompem a sequênci
       ['migrate', ['STEP:migrate']],
       ['check', ['STEP:migrate', 'STEP:check']]
     ]) {
-      const result = spawnSync('npm', ['start', '--silent'], {
+      const result = spawnSync(process.platform === 'win32' ? 'cmd.exe' : 'npm', process.platform === 'win32' ? ['/d', '/s', '/c', 'npm.cmd start --silent'] : ['start', '--silent'], {
         cwd, encoding: 'utf8', timeout: 30000,
         env: { ...process.env, NODE_ENV: 'production', FAIL_STEP: failure }
       });

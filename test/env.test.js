@@ -5,12 +5,19 @@ import pg from 'pg';
 import { parseEnv } from '../src/config/env.js';
 
 const production = {
-  NODE_ENV: 'production', LOCAL_DATABASE: 'false', PORT: '8080',
+  NODE_ENV: 'production', LOCAL_DATABASE: 'false', PORT: '8080', WORKER_ENABLED: 'false',
   TRUST_PROXY_HOPS: '1', APP_TIMEZONE: 'America/Fortaleza',
   SESSION_SECRET: randomBytes(48).toString('hex')
 };
 const authority = 'neon_owner:synthetic%40password%3Awith%2Fsymbols%26more@ep-example-pooler.us-east-2.aws.neon.tech:5432/neondb';
 const neonUrl = `postgresql://${authority}?sslmode=require&channel_binding=require`;
+
+test('worker exige conexão direta no Neon e SMTP completo quando habilitado', () => {
+  assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,WORKER_ENABLED:'true'}), /WORKER_REQUIRES_DIRECT_CONNECTION/);
+  assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,DATABASE_DIRECT_URL:neonUrl,WORKER_ENABLED:'true'}), /WORKER_REQUIRES_DIRECT_CONNECTION/);
+  assert.equal(parseEnv({...production,DATABASE_URL:neonUrl,DATABASE_DIRECT_URL:neonUrl.replace('-pooler',''),WORKER_ENABLED:'true'}).WORKER_ENABLED,'true');
+  assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,EMAIL_ENABLED:'true'}), /SMTP_HOST/);
+});
 
 test('produção aceita protocolos PostgreSQL e parâmetros Neon sem alterar a URL', () => {
   for (const protocol of ['postgresql', 'postgres', 'POSTGRESQL', 'POSTGRES']) {
