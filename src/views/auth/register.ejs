@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <main class="page narrow">
-  <a class="brand" href="/login"><span class="brand-mark">L</span> Licita<span>Match</span></a>
+  <%- include('../partials/logo', { href: '/login' }) %>
   <header class="page-heading"><span class="eyebrow">COMECE POR AQUI</span><h1>Cadastre sua empresa</h1><p class="muted">Você será o primeiro gestor da conta e poderá adicionar sua equipe.</p></header>
   <form method="post" action="/cadastro" class="panel stack">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
