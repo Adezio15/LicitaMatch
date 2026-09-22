@@ -29,6 +29,12 @@ export function accountService(database) {
     async createUser(empresaId, data) {
       return repository.createUser(empresaId, data, await bcrypt.hash(data.senha, rounds));
     },
+    async getDashboard(empresaId) {
+      return repository.getDashboard(empresaId);
+    },
+    async getAdminOverview() {
+      return repository.getAdminOverview();
+    },
     async updateUser(actor, id, data) {
       if (String(actor.id) === String(id)) throw new HttpError(422, 'Peça a outro gestor para alterar seu cadastro ou sua permissão.');
       return repository.transaction(async transaction => {

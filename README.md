@@ -46,7 +46,8 @@ O servidor verifica o banco antes de iniciar. Acesse `http://localhost:3000`, qu
 | `LOG_LEVEL` | Nível dos logs JSON; padrão `info` |
 | `TRUST_PROXY_HOPS` | Quantidade de proxies confiáveis; padrão 0, ajustar ao ambiente de deploy |
 | `SESSION_SECRET` | Segredo aleatório de pelo menos 48 caracteres, igual em todas as instâncias |
-| `SEED_USER_EMAIL` | E-mail do gestor fictício; padrão `gestor@example.test` |
+| `SEED_USER_ROLE` | Papel do usuário de seed em development; `gestor` ou `admin` |
+| `SEED_USER_EMAIL` | E-mail do usuário fictício; padrão `admin@local.test` quando `SEED_USER_ROLE=admin` |
 | `SEED_USER_PASSWORD` | Senha do seed, sem valor padrão, mínimo 12 caracteres |
 
 ### Neon
@@ -70,7 +71,7 @@ O `predev` inicia o banco caso necessário e aplica migrations pendentes quando 
 
 O setup recusa `NODE_ENV=production` e não substitui URLs que apontem para outro banco. Em Windows, resolve automaticamente o alias curto 8.3 para os binários quando há nomes como `Usuário` no caminho, sem mover os arquivos. Se o sistema não fornecer um alias sem acentos, use um checkout em um caminho sem acentos. A pasta do banco não deve ser apagada para resolver erros: contém todos os dados locais.
 
-Não há usuário de aplicação criado automaticamente. Abra `/cadastro` e cadastre sua empresa, ou configure a senha de seed e execute `npm.cmd run db:seed` para dados fictícios de desenvolvimento.
+Não há usuário de aplicação criado automaticamente. Abra `/cadastro` e cadastre sua empresa, ou configure `SEED_USER_ROLE`, `SEED_USER_EMAIL` e `SEED_USER_PASSWORD` e execute `npm.cmd run db:seed` para um usuário fictício em desenvolvimento. Para um acesso local de administrador, use `SEED_USER_ROLE=admin`.
 
 ### Produção com Neon
 
@@ -200,10 +201,270 @@ Cadastro: `razao_social`, `cnpj`, `email_empresa`, `nome`, `email`, `senha`; opc
 
 `npm run test:postgres` requer banco local iniciado. Cria um banco temporário próprio, valida migrations concorrentes com advisory locks reais, usuário sem superpoderes, cadastro, login/logout, isolamento e timezone; remove somente esse banco temporário ao concluir. Não insere dados de teste em `licitamatch_dev`. TLS remoto e o deploy Neon permanecem pendentes. Cookies Secure são testados simulando o proxy HTTPS; não substitui teste do deploy.
 
+## Parte 4: Perfis e regras de acesso
+
+A etapa 4 concentra a camada de perfis e o controle de permissões por tipo de usuário. O objetivo é garantir que cada conta tenha um papel claro dentro da organização e que o acesso siga regras explícitas, sem depender do cliente para segurança.
+
+### Perfis previstos
+
+- `usuario`: consulta dados da própria empresa e do próprio acesso; não pode editar dados cadastrais nem administrar a equipe.
+- `gestor`: administra a própria empresa e pode criar ou editar usuários do mesmo escopo; não pode elevar outro usuário a `admin`.
+- `admin`: reservado para administração global futura; continua limitado à empresa da sessão nesta etapa e não pode ser criado por cadastro público.
+
+### Regras de implementação
+
+- O middleware de autenticação valida sessão, empresa ativa, `auth_version` e expiração em toda rota protegida.
+- O middleware `requireManager` permite apenas `gestor` ou `admin` acessar rotas de empresa e usuários.
+- A criação de usuários é fechada para a empresa do gestor atual; a consulta de usuários nunca usa `empresa_id` enviado pelo cliente.
+- A alteração de usuários incrementa `auth_version`, invalidando sessões antigas e exigindo novo login em todos os dispositivos.
+- O papel `admin` não pode ser inserido pela API pública nem pela tela de cadastro, preservando o uso exclusivo para operação central.
+
+### Critério de aceite
+
+- Usuários comuns só veem o próprio acesso e a empresa em leitura.
+- Gestores conseguem gerir a empresa e a equipe da sua organização.
+- Administradores ficam visíveis no dashboard, mas sem liberar funções de criação global nesta fase.
+
+## Parte 5: Teste isolado do PNCP
+
+A etapa 5 introduz a base de integração com o Portal Nacional de Contratações Públicas (PNCP). O objetivo é criar um adaptador isolado, com teste automatizado sem depender da internet do ambiente de desenvolvimento, para validar a normalização de dados antes de persistir eventos e licitações reais.
+
+### Regras da integração
+
+- O adaptador é acessível via `src/services/sources/pncpSource.js`.
+- A fonte pública do PNCP é consultada de forma controlada, enviando somente parâmetros de paginação e termos opcionais.
+- Os dados retornados são normalizados para o formato interno do sistema, com campos mínimos: `id`, `objeto`, `dataAbertura`, `unidadeGestora` e `modalidade`.
+- Registros incompletos são descartados antes de entrar na fila de processamento.
+- Falhas de rede ou respostas HTTP inválidas geram erro explícito e não mascaram a causa real.
+
+### Teste isolado
+
+O teste automatizado em `test/pncp.test.js` usa um `fetch` simulado em vez de chamar a API pública. Isso mantém o ambiente estável e permite validar o contrato do adaptador em qualquer máquina de desenvolvimento.
+
+### Critério de aceite
+
+- A resposta do PNCP é normalizada corretamente.
+- Registros vazios ou incompletos são rejeitados.
+- Erros HTTP são propagados com mensagem legível.
+- O contrato do adaptador fica pronto para a próxima etapa de persistência e agendamento.
+
+## Parte 6: Persistência dos itens PNCP
+
+A etapa 6 adiciona a camada de persistência para os itens vindos do PNCP. O objetivo é armazenar os registros válidos em banco para que a próxima etapa possa montar a fila de processamento, deduplicar eventos e preparar consultas por data e origem.
+
+### Estrutura persistida
+
+A migration 003 cria a tabela `licitacoes_pncp`, com colunas para:
+
+- `codigo_externo`: identificador único do item no PNCP
+- `objeto`: descrição da licitação
+- `data_abertura`: timestamp do evento
+- `unidade_gestora`: instituição responsável
+- `modalidade`: modalidade da contratação
+- `origem`: valor fixo `pncp`
+- `created_at` e `updated_at`: auditoria padrão do sistema
+
+### Regras de persistência
+
+- Itens vazios ou inválidos não entram no banco.
+- Reprocessamento da mesma licitação não duplica registro por `codigo_externo`.
+- A consulta de histórico retorna os itens mais recentes primeiro.
+- A camada de persistência fica isolada em `src/services/pncpPersistenceService.js` para facilitar testes e extensão futura.
+
+### Critério de aceite
+
+- Um item válido é persistido uma única vez.
+- Um item duplicado é ignorado sem erro.
+- Um item incompleto é descartado antes de gravar.
+- A tabela sente o contrato de origem do PNCP e está pronta para a etapa de processamento posterior.
+
+## Parte 7: Matches e correlação de oportunidades
+
+A etapa 7 cria o mecanismo de matching entre interesses da empresa e licitações importadas do PNCP. O objetivo é relacionar cada oportunidade com as palavras-chave de negócio do cliente e produzir uma pontuação objetiva para priorização.
+
+### Estrutura da etapa
+
+A migration 004 cria duas tabelas:
+
+- `interesses`: conjunto de palavras-chave ou temas de interesse da empresa
+- `matches`: correlação entre interesse e licitação com score e status
+
+### Regras de match
+
+- A pontuação é calculada pela proporção de palavras-chave encontradas no texto da licitação.
+- O texto considerado inclui `objeto`, `modalidade` e `unidade_gestora`.
+- Termos curtos e duplicados são descartados para manter a pontuação estável.
+- Repetições de um mesmo match para o mesmo interesse e licitação são ignoradas.
+
+### Critério de aceite
+
+- Uma licitação com palavras-chave relevantes recebe score alto.
+- Uma licitação sem relação relevante recebe score baixo ou zero.
+- O mesmo par interesse/licitação não pode ser salvo duas vezes.
+- A fila de matches fica pronta para a próxima etapa de visualização e priorização.
+
+## Parte 8: Dashboard real
+
+A etapa 8 conecta a conta autenticada ao banco e substitui os valores fixos do painel por métricas reais do cliente: total de oportunidades, interesses ativos, usuários ativos e melhor correlação registrada.
+
+### Estrutura da etapa
+
+O dashboard passa a consultar a empresa da sessão e montar um resumo com:
+
+- total de matches para o escopo da empresa
+- número de interesses ativos
+- melhor score registrado no período
+- lista de oportunidades mais relevantes para exibir no painel
+
+### Regras de implementação
+
+- Os dados do painel são sempre calculados pela empresa da sessão, nunca por parâmertos externos.
+- O resumo usa `matches`, `interesses` e `usuarios` para refletir a realidade do cliente.
+- A listagem de oportunidades mostra apenas os registros mais relevantes e ordenados por score.
+- O template da conta continua acessível e seguro, com o mesmo controle de sessão e CSRF.
+
+### Critério de aceite
+
+- O dashboard apresenta métricas reais do banco para a empresa autenticada.
+- A lista de oportunidades reflete os matches existentes e não valores fictícios.
+- O painel continua funcionando como a área principal do usuário após login.
+- A próxima etapa pode seguir para fontes de dados externas, cron e alertas sem quebrar a conta.
+
+## Parte 9: Catálogo de fontes e integrações
+
+A etapa 9 formaliza o catálogo de fontes de dados do sistema. Em vez de depender de uma integração fixa, o backend passa a apontar para uma registry de adapters que expõem o mesmo contrato: cada fonte recebe um identificador, um nome e um método `fetchLatest()`.
+
+### Estrutura da etapa
+
+A nova camada fica em `src/services/sources/sourceRegistry.js` e permite:
+
+- registrar fontes por identificador (`pncp`, `demo`, `portal_x`)
+- listar as fontes ativas para o sistema
+- executar uma fonte específica com consulta opcional de página e filtros
+- rejeitar chamadas para fontes inexistentes com erro legível
+
+### Regras de implementação
+
+- Toda fonte registrada deve expor `fetchLatest(query)`.
+- O catálogo mantém o mesmo padrão de contrato da fonte PNCP e prepara a extensão para portais complementares.
+- Fontes desabilitadas podem permanecer registradas sem aparecer na listagem ativa.
+- A interface do sistema continua isolada do detalhe do adaptador, sem acoplamento direto a um único portal.
+
+### Critério de aceite
+
+- O sistema consegue listar fontes registradas e ativadas.
+- Uma fonte específica pode ser executada dinamicamente.
+- A chamada para uma origem inexistente falha com mensagem clara.
+- O projeto está pronto para a próxima etapa de validação real de um portal complementar.
+
+## Parte 10: Primeiro portal complementar validado
+
+A etapa 10 introduz a primeira integração complementar à base PNCP. O objetivo é validar um segundo provedor de compras públicas com o mesmo contrato do adaptador: normalização, paginação e rejeição de payloads inválidos.
+
+### Estrutura da etapa
+
+A nova fonte fica em `src/services/sources/comprasnetSource.js` e segue o mesmo padrão do PNCP:
+
+- `normalizeComprasnetItems(payload)` converte o payload do portal em itens internos
+- `createComprasnetSource(...)` executa a chamada HTTP e retorna `source`, `count` e `items`
+- o contrato do item interno continua consistente com `id`, `objeto`, `dataAbertura`, `unidadeGestora` e `modalidade`
+
+### Regras de implementação
+
+- O portal complementar usa o mesmo modelo interno do PNCP para evitar duplicação de regras de negócio.
+- Registros sem código, descrição, data ou órgão são descartados antes do processamento.
+- Falhas HTTP e erros de rede são propagados com mensagem clara para diagnóstico.
+- A fonte pode ser registrada no catálogo de fontes sem criar acoplamento ao restante da aplicação.
+
+### Critério de aceite
+
+- O payload do portal complementar é normalizado corretamente.
+- Dados incompletos são rejeitados antes de entrar no processamento.
+- Erros de resposta são explicitados e não mascarados.
+- O projeto já está preparado para a etapa de deduplicação e consolidação entre portais distintos.
+
+## Parte 11: Deduplicação de itens entre fontes
+
+A etapa 11 cria a camada de deduplicação para consolidar registros vindos de múltiplos portais. O objetivo é evitar que a mesma contratação apareça repetida quando o mesmo item chega por PNCP, ComprasNet ou outras integrações.
+
+### Estrutura da etapa
+
+A nova lógica fica em `src/services/deduplicationService.js` e opera em um conjunto de itens já normalizados. Ela gera uma assinatura estável para cada registro e elimina duplicatas sem perder a principal fonte de origem.
+
+### Regras de implementação
+
+- Se o item possui `id`, a assinatura usa esse identificador como prioridade.
+- Quando o identificador é diferente mas os campos fundamentais são equivalentes, a assinatura por texto normalizado faz a correlação.
+- O comparador considera `objeto`, `data`, `unidade gestora` e `modalidade` para criar a chave estável.
+- Itens repetidos são preservados apenas uma vez na lista final.
+
+### Critério de aceite
+
+- Itens duplicados entre fontes entram apenas uma vez na fila final.
+- Itens distintos continuam sobrevivendo como registros diferentes.
+- O processamento posterior não precisa lidar com cópias repetidas.
+- A base fica pronta para a etapa de e-mail e alertas.
+
+## Parte 12: E-mail e alertas
+
+A etapa 12 formaliza o serviço de e-mail do sistema para notificar os usuários quando há oportunidades relevantes com pontuação alta no painel de matches.
+
+### Estrutura da etapa
+
+A camada principal fica em `src/services/emailService.js` e expõe um serviço com transporte injetável:
+
+- `createEmailService({ transport, from })`
+- `sendMatchAlert({ to, customer, item, score, interestName })`
+
+Esse desenho permite conectar um provedor real de SMTP ou uma fila/adapter em produção sem acoplar o restante da aplicação aos detalhes do provedor escolhido.
+
+### Regras da integração
+
+- O serviço valida destinatário, subject e score antes de disparar o e-mail.
+- O texto e o HTML do alerta incluem o nome do interesse, a pontuação, o objeto e a unidade gestora.
+- A ausência de transporte configurado é tratada como erro explícito.
+- O alerta é útil para a próxima etapa de cronologia e disparo automatizado.
+
+### Critério de aceite
+
+- Um e-mail de oportunidade com payload válido é enviado corretamente.
+- E-mails inválidos são rejeitados antes do envio.
+- Sem transport configurado, a operação falha com mensagem legível.
+- O sistema fica pronto para a etapa 13 de orquestração e cron.
+
+## Parte 13: Cron e execução programada
+
+A etapa 13 cria a orquestração mínima de jobs recorrentes para sincronizar fontes externas e acionar a fila de alertas em intervalos regulares.
+
+### Estrutura da etapa
+
+A camada fica em `src/services/cronService.js` e oferece:
+
+- `register(name, job)` para registrar um job com intervalo e próxima execução
+- `listJobs()` para inspecionar a fila de jobs ativos
+- `runDue()` para executar somente os jobs vencidos no momento atual
+
+### Regras de implementação
+
+- Cada job precisa de `run()` e `intervalMs > 0`.
+- Quando um job dispara, a próxima execução é agendada em `now + intervalMs`.
+- Jobs que ainda não venceram ficam pausados até o limite temporal.
+- O serviço é unidirecional e não depende de um gerenciador de processos externo; ele organiza a recorrência do sistema de forma explícita.
+
+### Critério de aceite
+
+- Jobs vencidos são executados exatamente uma vez por ciclo.
+- Jobs futuros não executam antes do horário definido.
+- O serviço fornece observabilidade simples para manutenção e testes.
+- A base fica pronta para a etapa 14 de administração e supervisão global.
+
 ## Railway e próximas etapas
 
 A base aceita `PORT` do ambiente, logs em stdout e encerramento por `SIGTERM`. A preparação completa e o deploy são a etapa 16; nenhum serviço remoto foi provisionado ou publicado. Naquela etapa serão configurados variáveis, conexão Neon, migrations antes da liberação, comando `npm start`, healthcheck, proxy, reinicialização e domínio.
 
 Sequência restante: 3 layout/sidebar/dashboard; 4 perfis; 5 teste isolado PNCP; 6 persistência; 7 matches; 8 dashboard real; 9 fontes; 10 primeiro portal complementar validado; 11 deduplicação; 12 e-mail; 13 cron; 14 admin; 15 testes finais; 16 deploy.
+
+A etapa 8 foi concluída com o painel agora alimentado por dados reais da empresa autenticada.
+A etapa 9 acrescenta o catálogo de fontes e prepara a extensão para novos portais sem acoplar a aplicação a um único provedor.
 
 PNCP, scraping, envio de e-mail e cron ainda não estão ativos. As dependências específicas serão instaladas nas respectivas etapas. A documentação de cada integração acompanhará sua implementação, incluindo como adicionar um adaptador e os limites de requisição. APIs públicas terão prioridade; nenhuma proteção de portal será contornada.

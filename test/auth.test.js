@@ -150,6 +150,26 @@ test('autenticação e isolamento com SQL e sessões persistidas', async t => {
       for (const url of ['/conta', '/usuarios', '/usuarios/' + member.id]) await a.get(url).expect(200);
     });
 
+    await t.test('dashboard usa dados reais da empresa e lista oportunidades prioritárias', async () => {
+      await db.query(`INSERT INTO licitacoes_pncp (codigo_externo, objeto, data_abertura, unidade_gestora, modalidade)
+        VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)`,
+        ['L-1001', 'Compra de veículos para iluminação pública municipal', '2026-09-01T12:00:00Z', 'Prefeitura Municipal', 'Pregão Eletrônico',
+          'L-1002', 'Contratação de pavimentação e manutenção de vias urbanas', '2026-09-02T12:00:00Z', 'Secretaria de Obras', 'Tomada de Preços']);
+      await db.query(`INSERT INTO interesses (empresa_id, titulo, palavras)
+        VALUES ($1, $2, $3), ($1, $4, $5)`,
+        [userA.empresa_id, 'Infraestrutura e logística', ['infraestrutura', 'obras', 'veiculos'], 'Mobilidade urbana', ['pavimentacao', 'vias', 'logistica']]);
+      const { rows: interests } = await db.query('SELECT id, titulo FROM interesses WHERE empresa_id=$1 ORDER BY id', [userA.empresa_id]);
+      const { rows: licitacoes } = await db.query('SELECT id, objeto FROM licitacoes_pncp ORDER BY id DESC LIMIT 2');
+      await db.query(`INSERT INTO matches (interesse_id, licitacao_id, empresa_id, score, status)
+        VALUES ($1, $2, $3, $4, $5), ($6, $7, $3, $8, $9)`,
+        [interests[0].id, licitacoes[0].id, userA.empresa_id, 90, 'novo', interests[1].id, licitacoes[1].id, 75, 'revisado']);
+      const page = await a.get('/conta').expect(200);
+      assert.match(page.text, /Interesses ativos/);
+      assert.match(page.text, /Infraestrutura e logística/);
+      assert.match(page.text, /90%/);
+      assert.match(page.text, /Contratação de pavimentação e manutenção de vias urbanas/);
+    });
+
     await t.test('usuário comum não administra empresa nem equipe; desativação revoga acesso', async () => {
       const agent = request.agent(app);
       const response = await signIn(agent, 'member@example.test');
@@ -286,6 +306,29 @@ test('seed cria empresa/gestor com bcrypt e é idempotente em banco vazio', asyn
     assert.equal(rows.length, 1);
     assert.equal(rows[0].tipo, 'gestor');
     assert.equal(rows[0].razao_social, 'Empresa Exemplo LTDA');
+    assert.ok(await bcrypt.compare(password, rows[0].senha_hash));
+  } finally { await db.close(); }
+});
+
+test('seed cria empresa/admin quando a role for informada', async () => {
+  const db = new PGlite();
+  const database = {
+    query: (sql, values) => db.query(sql, values),
+    connect: async () => ({ query: (sql, values) => db.query(sql, values), release() {} })
+  };
+  try {
+    for (const migration of await readMigrations()) await db.exec(migration.sql);
+    const env = {
+      NODE_ENV: 'development',
+      SEED_USER_ROLE: 'admin',
+      SEED_USER_EMAIL: 'admin.local@example.test',
+      SEED_USER_PASSWORD: password
+    };
+    assert.equal(await seedDevelopment(database, env), true);
+    const { rows } = await db.query('SELECT u.tipo,u.email,u.senha_hash FROM usuarios u');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].tipo, 'admin');
+    assert.equal(rows[0].email, 'admin.local@example.test');
     assert.ok(await bcrypt.compare(password, rows[0].senha_hash));
   } finally { await db.close(); }
 });

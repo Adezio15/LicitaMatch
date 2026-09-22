@@ -14,7 +14,7 @@ try {
   const config = parseEnv(process.env);
   database = createDatabase(config, logger);
   const created = await seedDevelopment(database, process.env);
-  logger.info({ created }, created ? 'Empresa Exemplo e usuário gestor criados.' : 'Seed já existe; nenhum cadastro ou senha foi alterado.');
+  logger.info({ created }, created ? 'Empresa Exemplo e usuário de seed criados.' : 'Seed já existe; nenhum cadastro ou senha foi alterado.');
 } catch (error) {
   logger.error({ code: error.code }, error.code ? 'Falha no seed. Verifique migrations e banco.' : error.message);
   process.exitCode = 1;

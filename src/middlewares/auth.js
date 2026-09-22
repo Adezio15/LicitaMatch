@@ -28,3 +28,8 @@ export function requireManager(req, _res, next) {
   if (!['gestor', 'admin'].includes(req.user?.tipo)) throw new HttpError(403, 'Acesso permitido somente a gestores');
   next();
 }
+
+export function requireAdmin(req, _res, next) {
+  if (req.user?.tipo !== 'admin') throw new HttpError(403, 'Acesso reservado ao administrador');
+  next();
+}

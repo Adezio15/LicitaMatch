@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { accountService } from '../services/accountService.js';
 import { accountController } from '../controllers/accountController.js';
-import { loadUser, requireAuth, requireManager } from '../middlewares/auth.js';
+import { loadUser, requireAuth, requireManager, requireAdmin } from '../middlewares/auth.js';
 import { csrf } from '../middlewares/csrf.js';
 
 export function accountRoutes(database, config) {
@@ -24,6 +24,8 @@ export function accountRoutes(database, config) {
   router.post(['/cadastro', '/api/auth/register'], signupLimit, controller.register);
   router.post(['/logout', '/api/auth/logout'], requireAuth, controller.logout);
   router.get('/api/auth/me', requireAuth, controller.me);
+  router.get('/admin', requireAuth, requireAdmin, controller.adminDashboard);
+  router.get('/api/admin/empresas', requireAuth, requireAdmin, controller.adminEmpresas);
   router.get('/conta', requireAuth, controller.accountPage);
   router.post(['/conta/senha', '/api/auth/password'], requireAuth, loginLimit, controller.changePassword);
   router.get(['/empresa', '/api/empresa'], requireAuth, controller.company);

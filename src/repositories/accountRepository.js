@@ -55,6 +55,40 @@ export function accountRepository(database) {
       const { rows } = await database.query(`SELECT ${publicUserColumns} FROM usuarios WHERE empresa_id=$1 ORDER BY nome, id LIMIT 200`, [empresaId]);
       return rows;
     },
+    async listCompanies() {
+      const { rows } = await database.query(`SELECT e.*,
+        (SELECT count(*)::int FROM usuarios u WHERE u.empresa_id=e.id AND u.ativo=true) AS usuarios_ativos,
+        (SELECT count(*)::int FROM interesses i WHERE i.empresa_id=e.id AND i.ativo=true) AS interesses_ativos,
+        (SELECT count(*)::int FROM matches m WHERE m.empresa_id=e.id) AS oportunidades_totais
+        FROM empresas e
+        ORDER BY e.created_at DESC`);
+      return rows;
+    },
+    async getAdminOverview() {
+      const { rows: summaryRows } = await database.query(`SELECT
+        count(*)::int AS empresas_totais,
+        count(*) FILTER (WHERE status = 'ativo')::int AS empresas_ativas,
+        (SELECT count(*)::int FROM usuarios WHERE ativo=true) AS usuarios_ativos,
+        (SELECT count(*)::int FROM interesses WHERE ativo=true) AS interesses_ativos
+        FROM empresas`);
+      const empresas = await this.listCompanies();
+      return { summary: summaryRows[0] || {}, empresas };
+    },
+    async getDashboard(empresaId) {
+      const { rows: summaryRows } = await database.query(`SELECT
+        (SELECT count(*)::int FROM interesses WHERE empresa_id=$1 AND ativo=true) AS interesses_ativos,
+        (SELECT count(*)::int FROM matches WHERE empresa_id=$1) AS oportunidades_totais,
+        (SELECT COALESCE(max(score), 0)::int FROM matches WHERE empresa_id=$1) AS maior_score,
+        (SELECT count(*)::int FROM usuarios WHERE empresa_id=$1 AND ativo=true) AS usuarios_ativos`, [empresaId]);
+      const { rows: matchesRows } = await database.query(`SELECT m.id, m.score, m.status, m.empresa_id,
+        i.titulo AS interesse_titulo, l.objeto, l.modalidade, l.unidade_gestora, m.created_at
+        FROM matches m
+        JOIN interesses i ON i.id = m.interesse_id
+        JOIN licitacoes_pncp l ON l.id = m.licitacao_id
+        WHERE m.empresa_id=$1
+        ORDER BY m.score DESC, m.created_at DESC LIMIT 5`, [empresaId]);
+      return { ...(summaryRows[0] || {}), topMatches: matchesRows };
+    },
     async getUser(empresaId, id) {
       const { rows } = await database.query(`SELECT ${publicUserColumns} FROM usuarios WHERE empresa_id=$1 AND id=$2`, [empresaId, id]);
       return rows[0];

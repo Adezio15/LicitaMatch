@@ -4,6 +4,7 @@
     <a href="/conta">Minha conta</a>
     <a href="/empresa">Empresa</a>
     <% if (['gestor', 'admin'].includes(user.tipo)) { %><a href="/usuarios">Usuários</a><% } %>
+    <% if (user.tipo === 'admin') { %><a href="/admin">Admin</a><% } %>
     <form method="post" action="/logout">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button class="button secondary small" type="submit">Sair</button>

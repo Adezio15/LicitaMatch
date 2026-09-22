@@ -1,0 +1,89 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Menu lateral administrativo">
+    <div class="sidebar-brand-wrap">
+      <div class="brand light"><span class="brand-mark">L</span> Licita<span>Match</span></div>
+    </div>
+    <nav class="sidebar-nav" aria-label="Navegação administrativa">
+      <a class="nav-link" href="/conta">Dashboard</a>
+      <a class="nav-link" href="/empresa">Empresa</a>
+      <a class="nav-link active" href="/admin">Admin</a>
+    </nav>
+    <div class="sidebar-card">
+      <span class="eyebrow small">Visão global</span>
+      <h3>Administração</h3>
+      <p class="muted">Acesso exclusivo para gestão central da plataforma.</p>
+    </div>
+  </aside>
+
+  <main class="page dashboard-page">
+    <header class="page-heading dashboard-header">
+      <div>
+        <span class="eyebrow">PAINEL ADMINISTRATIVO</span>
+        <h1>Painel global</h1>
+      </div>
+      <div class="header-chip"><%= user.email %></div>
+    </header>
+
+    <section class="stats-grid" aria-label="Resumo geral da plataforma">
+      <article class="stat-card">
+        <span class="stat-label">Empresas</span>
+        <strong><%= data.summary?.empresas_totais ?? 0 %></strong>
+        <small class="muted">Total de clientes ativos no sistema</small>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Empresas ativas</span>
+        <strong><%= data.summary?.empresas_ativas ?? 0 %></strong>
+        <small class="muted">Organizações em operação</small>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Usuários ativos</span>
+        <strong><%= data.summary?.usuarios_ativos ?? 0 %></strong>
+        <small class="muted">Acessos habilitados</small>
+      </article>
+      <article class="stat-card accent">
+        <span class="stat-label">Interesses ativos</span>
+        <strong><%= data.summary?.interesses_ativos ?? 0 %></strong>
+        <small class="muted">Palavras-chave monitoradas</small>
+      </article>
+    </section>
+
+    <section class="panel section-gap">
+      <div class="panel-header">
+        <h2>Empresas cadastradas</h2>
+      </div>
+      <% if (data.empresas?.length) { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>CNPJ</th>
+                <th>Status</th>
+                <th>Usuários</th>
+                <th>Interesses</th>
+                <th>Matches</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% for (const empresa of data.empresas) { %>
+                <tr>
+                  <td><strong><%= empresa.razao_social %></strong><br><small class="muted"><%= empresa.nome_fantasia || 'Sem nome fantasia' %></small></td>
+                  <td><%= empresa.cnpj %></td>
+                  <td><span class="badge"><%= empresa.status %></span></td>
+                  <td><%= empresa.usuarios_ativos ?? 0 %></td>
+                  <td><%= empresa.interesses_ativos ?? 0 %></td>
+                  <td><%= empresa.oportunidades_totais ?? 0 %></td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <p class="muted">Ainda não existem empresas cadastradas na plataforma.</p>
+      <% } %>
+    </section>
+  </main>
+</div>
+<%- include('../partials/footer') %>

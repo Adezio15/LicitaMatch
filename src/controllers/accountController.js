@@ -50,7 +50,19 @@ export function accountController(service, config) {
       res.redirect(303, '/login');
     },
     me(req, res) { res.json({ user: safeUser(req.user) }); },
-    accountPage(req, res) { res.render('account/home', { title: 'Minha conta' }); },
+    async accountPage(req, res) {
+      const dashboard = await service.getDashboard(req.user.empresa_id);
+      res.render('account/home', { title: 'Minha conta', dashboard });
+    },
+    async adminDashboard(req, res) {
+      const data = await service.getAdminOverview();
+      res.render('account/admin', { title: 'Painel administrativo', data });
+    },
+    async adminEmpresas(req, res) {
+      const data = await service.getAdminOverview();
+      if (isApi(req)) return res.json({ summary: data.summary, empresas: data.empresas });
+      res.render('account/admin', { title: 'Painel administrativo', data });
+    },
     async company(req, res) {
       const company = await service.repository.getCompany(req.user.empresa_id);
       if (isApi(req)) return res.json({ company });

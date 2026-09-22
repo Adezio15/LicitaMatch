@@ -1,18 +1,111 @@
 <%- include('../partials/head') %>
 <%- include('../partials/nav') %>
-<main class="page">
-  <header class="page-heading"><span class="eyebrow">MINHA CONTA</span><h1>Olá, <%= user.nome %>.</h1><p class="muted"><%= user.nome_fantasia || user.razao_social %></p></header>
-  <div class="grid two">
-    <section class="panel"><h2>Seu acesso</h2><dl><dt>E-mail</dt><dd><%= user.email %></dd><dt>Permissão</dt><dd><%= { usuario: 'Usuário', gestor: 'Gestor da empresa', admin: 'Administrador' }[user.tipo] %></dd></dl><a href="/empresa">Ver dados da empresa →</a></section>
-    <section class="panel"><h2>Alterar senha</h2><p class="muted">Após a alteração, você precisará entrar novamente em todos os dispositivos.</p>
-      <form method="post" action="/conta/senha" class="stack">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label>Senha atual<input type="password" name="senha_atual" autocomplete="current-password" required></label>
-        <label>Nova senha<input type="password" name="senha" autocomplete="new-password" minlength="12" maxlength="72" required></label>
-        <small class="muted">Mínimo de 12 caracteres; máximo de 72 bytes.</small>
-        <button class="button" type="submit">Salvar nova senha</button>
-      </form>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Menu lateral do dashboard">
+    <div class="sidebar-brand-wrap">
+      <div class="brand light"><span class="brand-mark">L</span> Licita<span>Match</span></div>
+    </div>
+    <nav class="sidebar-nav" aria-label="Navegação principal">
+      <a class="nav-link active" href="/conta">Dashboard</a>
+      <a class="nav-link" href="/empresa">Empresa</a>
+      <% if (['gestor', 'admin'].includes(user.tipo)) { %><a class="nav-link" href="/usuarios">Usuários</a><% } %>
+      <% if (user.tipo === 'admin') { %><a class="nav-link" href="/admin">Admin</a><% } %>
+      <a class="nav-link" href="/conta#seguranca">Segurança</a>
+    </nav>
+    <div class="sidebar-card">
+      <span class="eyebrow small">Empresa</span>
+      <h3><%= user.nome_fantasia || user.razao_social || 'Sua empresa' %></h3>
+      <p class="muted"><%= { usuario: 'Usuário', gestor: 'Gestor', admin: 'Administrador' }[user.tipo] %> · <%= user.empresa_status || 'Ativa' %></p>
+    </div>
+  </aside>
+
+  <main class="page dashboard-page">
+    <header class="page-heading dashboard-header">
+      <div>
+        <span class="eyebrow">DASHBOARD</span>
+        <h1>Olá, <%= user.nome %>.</h1>
+      </div>
+      <div class="header-chip"><%= user.email %></div>
+    </header>
+
+    <section class="stats-grid" aria-label="Resumo do painel">
+      <article class="stat-card">
+        <span class="stat-label">Oportunidades em alta</span>
+        <strong><%= dashboard?.oportunidades_totais ?? 0 %></strong>
+        <small class="muted"><%= (dashboard?.topMatches?.length || 0) ? 'Últimos matches da empresa' : 'Nenhuma oportunidade registrada' %></small>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Interesses ativos</span>
+        <strong><%= dashboard?.interesses_ativos ?? 0 %></strong>
+        <small class="muted">Palavras-chave monitoradas</small>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Usuários ativos</span>
+        <strong><%= dashboard?.usuarios_ativos ?? 0 %></strong>
+        <small class="muted">Acesso da sua empresa</small>
+      </article>
+      <article class="stat-card accent">
+        <span class="stat-label">Maior match</span>
+        <strong><%= dashboard?.maior_score ?? 0 %>%</strong>
+        <small class="muted">Melhor correlação atual</small>
+      </article>
     </section>
-  </div>
-</main>
+
+    <div class="grid two dashboard-panels">
+      <section class="panel">
+        <h2>Oportunidades prioritárias</h2>
+        <% if (dashboard?.topMatches?.length) { %>
+          <ul class="check-list">
+            <% for (const match of dashboard.topMatches) { %>
+              <li><span class="dot ok"></span><strong><%= match.score %>%</strong> · <%= match.interesse_titulo %> — <%= match.objeto %> (<%= match.modalidade %>)</li>
+            <% } %>
+          </ul>
+        <% } else { %>
+          <p class="muted">Ainda não há oportunidades correlacionadas para esta empresa.</p>
+        <% } %>
+      </section>
+
+      <section class="panel" id="seguranca">
+        <h2>Segurança e acesso</h2>
+        <form method="post" action="/conta/senha" class="stack compact-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Senha atual<input type="password" name="senha_atual" autocomplete="current-password" required></label>
+          <label>Nova senha<input type="password" name="senha" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+          <small class="muted">Mínimo de 12 caracteres; máximo de 72 bytes.</small>
+          <button class="button" type="submit">Salvar nova senha</button>
+        </form>
+      </section>
+    </div>
+
+    <section class="panel section-gap profile-panel">
+      <div class="panel-header">
+        <h2>Perfil e permissões</h2>
+        <span class="badge profile-badge"><%= { usuario: 'Usuário', gestor: 'Gestor', admin: 'Administrador' }[user.tipo] %></span>
+      </div>
+      <ul class="permission-list">
+        <% const permissions = {
+          usuario: ['Consultar a própria empresa', 'Visualizar dados do seu acesso', 'Não alterar cadastros da organização'],
+          gestor: ['Editar dados da empresa', 'Gerenciar usuários da própria empresa', 'Criar e atualizar acessos do time'],
+          admin: ['Acesso administrativo da empresa', 'Gerenciar permissões internas da conta', 'Acesso reservado para administração futura']
+        }[user.tipo]; %>
+        <% for (const permission of permissions) { %>
+          <li><span class="dot ok"></span><%= permission %></li>
+        <% } %>
+      </ul>
+    </section>
+
+    <section class="panel section-gap">
+      <h2>Próximos passos da plataforma</h2>
+      <div class="roadmap">
+        <div class="roadmap-item done"><span>1</span><div><strong>Fundação</strong><p>Autenticação, empresas e permissões concluídas.</p></div></div>
+        <div class="roadmap-item done"><span>2</span><div><strong>Layout e dashboard</strong><p>Estrutura inicial do painel e navegação lateral.</p></div></div>
+        <div class="roadmap-item done"><span>3</span><div><strong>Perfis e regras</strong><p>Visibilidade por tipo de acesso e políticas de permissão.</p></div></div>
+        <div class="roadmap-item done"><span>4</span><div><strong>PNCP isolado</strong><p>Adaptador e teste de integração sem depender da internet.</p></div></div>
+        <div class="roadmap-item done"><span>5</span><div><strong>Persistência</strong><p>Armazenamento dos itens PNCP no banco com deduplicação.</p></div></div>
+        <div class="roadmap-item active"><span>6</span><div><strong>Matches</strong><p>Correlação entre interesses da empresa e oportunidades de compra.</p></div></div>
+        <div class="roadmap-item"><span>7</span><div><strong>Dashboard real</strong><p>Visão operacional alimentada por licitações e matches do banco.</p></div></div>
+      </div>
+    </section>
+  </main>
+</div>
 <%- include('../partials/footer') %>
