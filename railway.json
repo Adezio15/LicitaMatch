@@ -4,7 +4,7 @@
     "builder": "RAILPACK"
   },
   "deploy": {
-    "preDeployCommand": ["npm run db:migrate"],
+    "preDeployCommand": ["npm run db:migrate && npm run db:check"],
     "startCommand": "npm start",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 100,

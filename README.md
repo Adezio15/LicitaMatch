@@ -89,6 +89,21 @@ As migrations e o driver `pg` são os mesmos nos dois ambientes. Não é necess�
 
 O `railway.json` configura Railpack, migrations no pre-deploy, `npm start`, healthcheck em `/health/ready` e até três tentativas de reinício em caso de falha. Esses campos seguem a [configuração oficial do Railway](https://docs.railway.com/config-as-code/reference).
 
+O pre-deploy executa `npm run db:migrate && npm run db:check`. O primeiro comando prefere `DATABASE_DIRECT_URL` e usa `DATABASE_URL` quando a URL direta não foi configurada; compara as tabelas e o histórico antes de aplicar somente migrations pendentes, depois valida `SELECT 1`, tabelas e checksums. O segundo confirma o schema pela URL usada pela aplicação e também pela URL direta, quando presente. Uma falha impede a liberação do novo deploy. Não configure esses comandos como Build Command: eles precisam do ambiente de execução e acesso ao banco.
+
+As migrations usam um executor próprio em `src/services/migrationService.js`, com o driver `pg`, lock transacional, checksums SHA-256 e histórico em `schema_migrations`. Não há Prisma, Knex ou Sequelize.
+
+| Migration | Tabelas criadas / alteração |
+| --- | --- |
+| `001_foundation.sql` | Cria `empresas` e `usuarios` |
+| `002_auth_sessions.sql` | Cria `sessoes` e adiciona `usuarios.auth_version` |
+| `003_pncp_persistence.sql` | Cria `licitacoes_pncp` |
+| `004_matches.sql` | Cria `interesses` e `matches` |
+
+O executor cria também `schema_migrations`; portanto, são sete tabelas obrigatórias. Os arquivos atuais adicionam tabelas, coluna, índices, funções e triggers, sem remoção de dados. Migrations registradas com checksum correspondente não são reaplicadas. O log `applied` informa exatamente quais foram confirmadas; `tablesBefore` e `tablesAfter` mostram as tabelas obrigatórias presentes antes e depois. Havendo execução concorrente, outra instância também pode ter criado tabelas entre essas verificações.
+
+Se o histórico disser que uma migration foi aplicada mas sua tabela estiver ausente, o diagnóstico falha: não apague registros do histórico nem recrie tabelas manualmente para contornar o erro. Se uma tabela já existir sem histórico, a migration pode falhar e a transação será revertida, preservando o estado anterior. Nesse caso, compare o schema existente antes de preparar uma correção específica. Um banco novo exige as quatro migrations; um banco parcialmente migrado recebe somente as pendentes.
+
 1. Conecte o repositório e use a raiz do projeto como Root Directory. O projeto não precisa de `npm run build`; remova esse comando caso tenha sido configurado manualmente.
 2. Nas Variables do serviço da aplicação, configure as variáveis de `.env.production.example` com valores reais. Os arquivos `.env.*.example` não são carregados pelo deploy. `SESSION_SECRET` precisa ter pelo menos 48 caracteres e não pode ser o texto de exemplo. Gere um valor com `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"`.
 3. Use `TRUST_PROXY_HOPS=1` para a configuração com um proxy confiável e `LOCAL_DATABASE=false`. Deixe o Railway fornecer `PORT`.
