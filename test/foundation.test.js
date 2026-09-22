@@ -13,6 +13,13 @@ const logger = createLogger('silent');
 
 test('ambiente exige banco e rejeita porta/timezone inválidos sem expor segredos', () => {
   assert.throws(() => parseEnv({}), /DATABASE_URL/);
+  assert.throws(() => parseEnv({ DATABASE_URL: 'senha-secreta', SESSION_SECRET: 'segredo-curto' }), error => {
+    assert.equal(error.code, 'INVALID_ENV');
+    assert.deepEqual(error.fields, ['DATABASE_URL', 'SESSION_SECRET']);
+    assert.ok(!JSON.stringify(error).includes('senha-secreta'));
+    assert.ok(!JSON.stringify(error).includes('segredo-curto'));
+    return true;
+  });
   assert.throws(() => parseEnv({ DATABASE_URL: 'senha-secreta' }), error => !error.message.includes('senha-secreta'));
   assert.throws(() => parseEnv({ ...config, PORT: 'abc' }), /PORT/);
   assert.throws(() => parseEnv({ ...config, APP_TIMEZONE: 'UTC' }), /APP_TIMEZONE/);
@@ -46,7 +53,7 @@ test('migrations: SQL PostgreSQL, constraints, idempotência, checksum e rollbac
   // PGlite é single-process e não implementa advisory locks. Só esse comando é substituído.
   const client = { query: async (sql, params) => {
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
-    if (sql.includes('CREATE TABLE empresas') || sql.includes('CREATE TABLE sessoes')) return db.exec(sql);
+    if (sql.includes('CREATE TABLE')) return db.exec(sql);
     return db.query(sql, params);
   } };
   try {

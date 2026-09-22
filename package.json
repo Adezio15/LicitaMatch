@@ -17,6 +17,7 @@
     "test:postgres": "node scripts/check-postgres.js",
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate.js",
+    "db:check": "node scripts/check-deploy.js",
     "db:seed": "node scripts/seed.js",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage"

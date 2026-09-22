@@ -85,6 +85,22 @@ Use `.env.production.example` como referência para as variáveis do Railway; el
 
 As migrations e o driver `pg` são os mesmos nos dois ambientes. Não é necessário mudar repositories ou services para apontar para Neon. Dados de desenvolvimento não são transferidos automaticamente. A conexão remota e o deploy ainda precisam ser validados quando as credenciais Neon estiverem disponíveis.
 
+### Deploy no Railway
+
+O `railway.json` configura Railpack, migrations no pre-deploy, `npm start`, healthcheck em `/health/ready` e até três tentativas de reinício em caso de falha. Esses campos seguem a [configuração oficial do Railway](https://docs.railway.com/config-as-code/reference).
+
+1. Conecte o repositório e use a raiz do projeto como Root Directory. O projeto não precisa de `npm run build`; remova esse comando caso tenha sido configurado manualmente.
+2. Nas Variables do serviço da aplicação, configure as variáveis de `.env.production.example` com valores reais. Os arquivos `.env.*.example` não são carregados pelo deploy. `SESSION_SECRET` precisa ter pelo menos 48 caracteres e não pode ser o texto de exemplo. Gere um valor com `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"`.
+3. Use `TRUST_PROXY_HOPS=1` para a configuração com um proxy confiável e `LOCAL_DATABASE=false`. Deixe o Railway fornecer `PORT`.
+4. Se usar o PostgreSQL do Railway em vez do Neon, configure `DATABASE_URL` com a referência `${{Postgres.DATABASE_URL}}`, ajustando `Postgres` ao nome do serviço. Deixe `DATABASE_DIRECT_URL` ausente nesse caso; as migrations usam `DATABASE_URL`. Não use `localhost` nem a URL do banco local de desenvolvimento.
+5. Opcionalmente, configure `RAILPACK_NODE_NPM_INSTALL=npm ci --omit=dev` para instalar somente as dependências de produção. Faça o deploy e confira os logs de build, pre-deploy e inicialização. Após subir, gere um domínio nas configurações de Networking.
+
+Se aparecer `INVALID_ENV` em `error.code`, o campo `fields` no log lista as variáveis ausentes ou inválidas sem mostrar seus valores. Erros de conexão como `ECONNREFUSED` ou `ENOTFOUND` exigem conferir o endereço e a disponibilidade do banco. A inicialização valida `SELECT 1`, tabelas e checksums das migrations antes de abrir a porta; `DATABASE_SCHEMA_MISMATCH` indica schema incompleto ou divergente. `/health/ready` continua verificando a conexão após a inicialização.
+
+Para investigar um Crash, execute `npm run db:check` no ambiente do serviço com suas variáveis configuradas. O comando usa apenas consultas de leitura: testa `DATABASE_URL` e, quando presente, `DATABASE_DIRECT_URL`, verifica as sete tabelas e as quatro migrations. Não cria tabelas, não aplica migrations e não lê dados de clientes. A URL direta é opcional; se fornecida, deve ser válida e apontar ao mesmo banco/branch Neon da URL da aplicação. Verifique isso no painel Neon: schemas iguais, por si só, não provam que duas URLs apontam ao mesmo banco.
+
+Os logs de falha incluem `stage` e `error.name`, `error.message`, `error.code`, `error.stack`, com remoção de URLs PostgreSQL, credenciais e valores secretos do ambiente. Não envie o `.env` nem URLs de conexão para suporte; compartilhe apenas o diagnóstico sanitizado. As etapas `environment`, `database_connection`, `database_schema`, `application` e `http_listen` indicam onde a inicialização parou. Não desative a verificação TLS para contornar erros de certificado. O aviso `npm warn config production Use --omit=dev instead` não é a causa de Crash.
+
 ## Organização
 
 ```text
@@ -460,7 +476,7 @@ A camada fica em `src/services/cronService.js` e oferece:
 
 ## Railway e próximas etapas
 
-A base aceita `PORT` do ambiente, logs em stdout e encerramento por `SIGTERM`. A preparação completa e o deploy são a etapa 16; nenhum serviço remoto foi provisionado ou publicado. Naquela etapa serão configurados variáveis, conexão Neon, migrations antes da liberação, comando `npm start`, healthcheck, proxy, reinicialização e domínio.
+A base aceita `PORT` do ambiente, logs em stdout e encerramento por `SIGTERM`. O `railway.json` configura migrations antes da liberação, comando `npm start`, healthcheck e reinicialização. Nenhum serviço remoto foi provisionado ou publicado nesta preparação; ainda é necessário configurar variáveis, banco, proxy e domínio e validar o deploy real conforme as instruções acima.
 
 Sequência restante: 3 layout/sidebar/dashboard; 4 perfis; 5 teste isolado PNCP; 6 persistência; 7 matches; 8 dashboard real; 9 fontes; 10 primeiro portal complementar validado; 11 deduplicação; 12 e-mail; 13 cron; 14 admin; 15 testes finais; 16 deploy.
 

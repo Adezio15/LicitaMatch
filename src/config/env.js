@@ -24,7 +24,11 @@ export function parseEnv(input) {
   const result = schema.safeParse(input);
   if (!result.success) {
     // Nunca incluir valores recebidos: URLs podem conter credenciais.
-    throw new Error(`Configuração inválida: ${[...new Set(result.error.issues.map(issue => issue.path.join('.')))].join(', ')}. Consulte .env.example.`);
+    const fields = [...new Set(result.error.issues.map(issue => issue.path.join('.')))];
+    const error = new Error(`Configuração inválida: ${fields.join(', ')}. Consulte .env.example.`);
+    error.code = 'INVALID_ENV';
+    error.fields = fields;
+    throw error;
   }
   return Object.freeze(result.data);
 }

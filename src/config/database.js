@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { safeError } from '../utils/safeError.js';
 
 export function createDatabase(config, logger) {
   const pool = new pg.Pool({
@@ -10,6 +11,6 @@ export function createDatabase(config, logger) {
     options: '-c timezone=UTC',
     application_name: 'licitamatch'
   });
-  pool.on('error', error => logger.error({ code: error.code }, 'Erro em conexão ociosa do banco'));
+  pool.on('error', error => logger.error({ error: safeError(error) }, 'Erro em conexão ociosa do banco'));
   return pool;
 }
