@@ -3,7 +3,28 @@ import { z } from 'zod';
 
 dotenv.config({ quiet: true });
 
-const postgresUrl = z.string().url().refine(value => /^postgres(?:ql)?:\/\//.test(value), 'Use uma URL PostgreSQL');
+const invalid = (ctx, reason) => ctx.addIssue({ code: 'custom', message: reason });
+const postgresUrl = z.string().superRefine((value, ctx) => {
+  if (!value) return invalid(ctx, 'EMPTY');
+  if (value !== value.trim()) return invalid(ctx, 'SURROUNDING_WHITESPACE');
+  if (/^(?:psql\b|(?:export\s+)?DATABASE(?:_DIRECT)?_URL\s*=)/i.test(value)) return invalid(ctx, 'COMMAND_INSTEAD_OF_URL');
+  if (/^['"`]/.test(value)) return invalid(ctx, 'QUOTED_VALUE');
+  if (/^\$\{/.test(value)) return invalid(ctx, 'UNRESOLVED_REFERENCE');
+  let url;
+  try { url = new URL(value); }
+  catch { return invalid(ctx, 'MALFORMED_URL'); }
+  // WHATWG URL normalizes the protocol only for this check. Preserve the original
+  // string, credentials and all query parameters for node-postgres.
+  if (!['postgresql:', 'postgres:'].includes(url.protocol) || !/^postgres(?:ql)?:\/\//i.test(value)) {
+    return invalid(ctx, 'POSTGRES_PROTOCOL_REQUIRED');
+  }
+  if (!url.hostname) return invalid(ctx, 'HOST_REQUIRED');
+});
+
+const sessionSecret = z.string().min(48).superRefine((value, ctx) => {
+  if (/CHANGE_ME|SUBSTITUA|troque/i.test(value)) return invalid(ctx, 'PLACEHOLDER_SECRET');
+  if (!value.trim() || /^(.)\1+$/s.test(value)) return invalid(ctx, 'WEAK_SECRET');
+});
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOCAL_DATABASE: z.enum(['true', 'false']).default('false'),
@@ -12,7 +33,7 @@ const schema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   DATABASE_URL: postgresUrl,
-  SESSION_SECRET: z.string().min(48).refine(value => !/CHANGE_ME|SUBSTITUA|troque/i.test(value), 'Gere um segredo aleatório'),
+  SESSION_SECRET: sessionSecret,
   DATABASE_DIRECT_URL: z.preprocess(value => value === '' ? undefined : value, postgresUrl.optional()),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
   DATABASE_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(100).max(60000).default(10000)
@@ -24,10 +45,18 @@ export function parseEnv(input) {
   const result = schema.safeParse(input);
   if (!result.success) {
     // Nunca incluir valores recebidos: URLs podem conter credenciais.
-    const fields = [...new Set(result.error.issues.map(issue => issue.path.join('.')))];
-    const error = new Error(`Configuração inválida: ${fields.join(', ')}. Consulte .env.example.`);
+    const issues = result.error.issues.map(issue => ({
+      field: issue.path.join('.'),
+      // Never log Zod's raw issue/input or interpolate the supplied value.
+      reason: issue.code === 'custom' && /^[A-Z_]+$/.test(issue.message) ? issue.message :
+        issue.code === 'invalid_type' ? (input?.[issue.path[0]] === undefined ? 'MISSING' : 'INVALID_TYPE') :
+        issue.code === 'too_small' && issue.path[0] === 'SESSION_SECRET' ? 'MIN_48_CHARACTERS' : 'INVALID_VALUE'
+    }));
+    const fields = [...new Set(issues.map(issue => issue.field))];
+    const error = new Error(`Configuração inválida: ${issues.map(issue => `${issue.field} (${issue.reason})`).join(', ')}. Consulte .env.example.`);
     error.code = 'INVALID_ENV';
     error.fields = fields;
+    error.issues = issues;
     throw error;
   }
   return Object.freeze(result.data);

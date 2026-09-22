@@ -23,7 +23,7 @@ try {
   const applied = await runMigrations(client, await readMigrations());
   logger.info({ applied }, 'Migrations concluídas');
 } catch (error) {
-  logger.error({ stage, error: safeError(error), fields: error.code === 'INVALID_ENV' ? error.fields : undefined }, 'Falha nas migrations. Verifique configuração, conexão e integridade dos arquivos SQL.');
+  logger.error({ stage, error: safeError(error), fields: error.code === 'INVALID_ENV' ? error.fields : undefined, issues: error.code === 'INVALID_ENV' ? error.issues : undefined }, 'Falha nas migrations. Verifique configuração, conexão e integridade dos arquivos SQL.');
   process.exitCode = 1;
 } finally {
   if (client) {

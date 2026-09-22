@@ -32,6 +32,6 @@ try {
     }
   }
 } catch (error) {
-  logger.error({ stage, error: safeError(error), fields: error.code === 'INVALID_ENV' ? error.fields : undefined }, 'Diagnóstico de deploy falhou');
+  logger.error({ stage, error: safeError(error), fields: error.code === 'INVALID_ENV' ? error.fields : undefined, issues: error.code === 'INVALID_ENV' ? error.issues : undefined }, 'Diagnóstico de deploy falhou');
   process.exitCode = 1;
 }

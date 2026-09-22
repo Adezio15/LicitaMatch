@@ -59,7 +59,7 @@ try {
 } catch (error) {
   // Even LOG_LEVEL=silent must not hide a fatal startup failure.
   if (logger.level === 'silent') logger.level = 'fatal';
-  logger.fatal({ stage, error: safeError(error), fields: error.code === 'INVALID_ENV' ? error.fields : undefined }, 'Falha ao iniciar. Verifique variáveis de ambiente e conexão PostgreSQL.');
+  logger.fatal({ stage, error: safeError(error), fields: error.code === 'INVALID_ENV' ? error.fields : undefined, issues: error.code === 'INVALID_ENV' ? error.issues : undefined }, 'Falha ao iniciar. Verifique variáveis de ambiente e conexão PostgreSQL.');
   process.exitCode = 1;
   await closeResources();
 }

@@ -50,6 +50,8 @@ test('startup e diagnóstico retornam erro útil de ambiente sem segredos', () =
     const log = result.stdout.trim().split('\n').map(line => JSON.parse(line)).find(row => row.error);
     assert.equal(log.stage, 'environment');
     assert.equal(log.error.code, 'INVALID_ENV');
+    assert.ok(log.issues.some(issue => issue.field === 'DATABASE_URL' && issue.reason === 'MALFORMED_URL'));
+    assert.ok(log.issues.some(issue => issue.field === 'SESSION_SECRET' && issue.reason === 'MIN_48_CHARACTERS'));
     assert.match(log.error.message, /DATABASE_URL/);
     assert.ok(log.error.stack);
     assert.ok(!(result.stdout + result.stderr).includes('invalid-private-url'));

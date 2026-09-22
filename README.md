@@ -101,6 +101,10 @@ Para investigar um Crash, execute `npm run db:check` no ambiente do serviço com
 
 Os logs de falha incluem `stage` e `error.name`, `error.message`, `error.code`, `error.stack`, com remoção de URLs PostgreSQL, credenciais e valores secretos do ambiente. Não envie o `.env` nem URLs de conexão para suporte; compartilhe apenas o diagnóstico sanitizado. As etapas `environment`, `database_connection`, `database_schema`, `application` e `http_listen` indicam onde a inicialização parou. Não desative a verificação TLS para contornar erros de certificado. O aviso `npm warn config production Use --omit=dev instead` não é a causa de Crash.
 
+Em `INVALID_ENV`, consulte também `issues`: cada item tem apenas `field` e `reason`, sem o valor da variável. `MISSING` significa variável ausente no processo; `EMPTY`, valor vazio; `QUOTED_VALUE`, aspas literais; `COMMAND_INSTEAD_OF_URL`, comando `psql` ou atribuição `DATABASE_URL=` colados no lugar da URL; `SURROUNDING_WHITESPACE`, espaços ou quebras de linha nas extremidades; `UNRESOLVED_REFERENCE`, referência de variável não resolvida; `MALFORMED_URL`, sintaxe inválida; `POSTGRES_PROTOCOL_REQUIRED`, protocolo inválido; `HOST_REQUIRED`, host ausente. Em Variables do Railway, cole somente a URL no valor de `DATABASE_URL`, sem aspas nem comando. `postgresql://` e `postgres://`, incluindo `sslmode=require&channel_binding=require`, são aceitos sem reescrever a credencial ou os parâmetros. A validação anterior já aceitava esses dois protocolos em minúsculas e esses parâmetros; somente a lista `fields` não permite determinar qual regra rejeitou o valor do deploy.
+
+Para `SESSION_SECRET`, `MIN_48_CHARACTERS` indica comprimento insuficiente; `PLACEHOLDER_SECRET` rejeita textos como `SUBSTITUA_POR_...`; `WEAK_SECRET` rejeita espaços ou um único caractere repetido. Use o gerador aleatório indicado acima: comprimento mínimo sozinho não garante entropia.
+
 ## Organização
 
 ```text
