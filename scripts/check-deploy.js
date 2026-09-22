@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { parseEnv } from '../src/config/env.js';
+import { loadEnvironment, parseEnv } from '../src/config/env.js';
 import { createLogger } from '../src/utils/logger.js';
 import { safeError } from '../src/utils/safeError.js';
 import { checkDatabase } from '../src/services/databaseCheckService.js';
@@ -7,6 +7,7 @@ import { checkDatabase } from '../src/services/databaseCheckService.js';
 const logger = createLogger();
 let stage = 'environment';
 try {
+  loadEnvironment(logger);
   const config = parseEnv(process.env);
   logger.info({ directUrlConfigured: Boolean(config.DATABASE_DIRECT_URL) }, 'Variáveis válidas; DATABASE_DIRECT_URL é opcional e usa DATABASE_URL quando ausente');
   for (const target of ['DATABASE_URL', ...(config.DATABASE_DIRECT_URL ? ['DATABASE_DIRECT_URL'] : [])]) {

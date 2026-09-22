@@ -1,14 +1,12 @@
-import dotenv from 'dotenv';
-import { parseEnv } from '../src/config/env.js';
+import { loadEnvironment, parseEnv } from '../src/config/env.js';
 import { createDatabase } from '../src/config/database.js';
 import { createLogger } from '../src/utils/logger.js';
 import { seedDevelopment } from '../src/services/seedService.js';
 
-dotenv.config({ quiet: true });
-
 const logger = createLogger();
 let database;
 try {
+  loadEnvironment(logger);
   if (process.env.NODE_ENV !== 'development') throw new Error('Seed permitido somente com NODE_ENV=development explícito.');
   if (!process.env.SEED_USER_PASSWORD) throw new Error('Defina SEED_USER_PASSWORD com pelo menos 12 caracteres no .env.');
   const config = parseEnv(process.env);

@@ -47,7 +47,9 @@ test('startup e diagnóstico retornam erro útil de ambiente sem segredos', () =
       env: { ...process.env, DATABASE_URL: 'invalid-private-url', DATABASE_DIRECT_URL: '', SESSION_SECRET: 'short-private-secret', NODE_ENV: 'production', LOCAL_DATABASE: 'false' }
     });
     assert.equal(result.status, 1);
-    const log = result.stdout.trim().split('\n').map(line => JSON.parse(line)).find(row => row.error);
+    const logs = result.stdout.trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(logs.slice(0, 2).map(row => row.msg), ['DATABASE_URL presente: true', 'SESSION_SECRET presente: true']);
+    const log = logs.find(row => row.error);
     assert.equal(log.stage, 'environment');
     assert.equal(log.error.code, 'INVALID_ENV');
     assert.ok(log.issues.some(issue => issue.field === 'DATABASE_URL' && issue.reason === 'MALFORMED_URL'));

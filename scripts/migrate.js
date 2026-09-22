@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { parseEnv } from '../src/config/env.js';
+import { loadEnvironment, parseEnv } from '../src/config/env.js';
 import { createLogger } from '../src/utils/logger.js';
 import { safeError } from '../src/utils/safeError.js';
 import { readMigrations, runMigrations } from '../src/services/migrationService.js';
@@ -8,6 +8,7 @@ const logger = createLogger();
 let client;
 let stage = 'environment';
 try {
+  loadEnvironment(logger);
   const config = parseEnv(process.env);
   stage = 'migration_connection';
   client = new pg.Client({

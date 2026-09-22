@@ -1,7 +1,17 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-dotenv.config({ quiet: true });
+// Called explicitly by entrypoints before validation. Importing this module does
+// not read files or mutate process.env. Railway injects variables into the process.
+export function loadEnvironment(logger) {
+  const railway = Boolean(process.env.RAILWAY_ENVIRONMENT_ID || process.env.RAILWAY_SERVICE_ID);
+  if (process.env.NODE_ENV !== 'production' && !railway) {
+    dotenv.config({ quiet: true, override: false });
+  }
+  // Temporary startup diagnostic: existence only, never values or lengths.
+  logger?.info(`DATABASE_URL presente: ${process.env.DATABASE_URL !== undefined}`);
+  logger?.info(`SESSION_SECRET presente: ${process.env.SESSION_SECRET !== undefined}`);
+}
 
 const invalid = (ctx, reason) => ctx.addIssue({ code: 'custom', message: reason });
 const postgresUrl = z.string().superRefine((value, ctx) => {

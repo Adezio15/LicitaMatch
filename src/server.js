@@ -1,4 +1,4 @@
-import { parseEnv } from './config/env.js';
+import { loadEnvironment, parseEnv } from './config/env.js';
 import { createDatabase } from './config/database.js';
 import { createLogger } from './utils/logger.js';
 import { safeError } from './utils/safeError.js';
@@ -22,6 +22,7 @@ async function closeResources() {
   }
 }
 try {
+  loadEnvironment(logger);
   const config = parseEnv(process.env);
   logger.level = config.LOG_LEVEL;
   stage = 'database_connection';
