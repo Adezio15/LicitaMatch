@@ -30,6 +30,15 @@ test('admin global acessa painel geral e gestores comuns não acessam', async ()
   const gestorHash = await bcrypt.hash('Senha-de-teste-2026!', 12);
   await db.query(`INSERT INTO usuarios (empresa_id, nome, email, senha_hash, tipo) VALUES ($1,$2,$3,$4,$5)`, [gestorCompany.id, 'Gestor Local', 'gestor@local.test', gestorHash, 'gestor']);
 
+  const adminLoginAgent = request.agent(app);
+  const adminLoginCsrf = (await adminLoginAgent.get('/api/auth/csrf').expect(200)).body.csrfToken;
+  const adminLoginRedirect = await adminLoginAgent.post('/login')
+    .redirects(0)
+    .set('X-CSRF-Token', adminLoginCsrf)
+    .send({ email: 'admin@local.test', senha: 'Senha-de-teste-2026!' })
+    .expect(303);
+  assert.equal(adminLoginRedirect.headers.location, '/admin');
+
   const adminCsrf = (await adminAgent.get('/api/auth/csrf').expect(200)).body.csrfToken;
   const adminLogin = await adminAgent.post('/api/auth/login')
     .set('X-CSRF-Token', adminCsrf)

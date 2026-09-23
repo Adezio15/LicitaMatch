@@ -18,7 +18,7 @@ export function accountRoutes(database, config) {
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(loadUser(service.repository, config), csrf);
   router.use(opportunityRoutes(database));
-  router.get('/', (req, res) => res.redirect(req.user ? '/conta' : '/login'));
+  router.get('/', (req, res) => res.redirect(req.user ? (req.user.tipo === 'admin' ? '/admin' : '/conta') : '/login'));
   router.get('/login', controller.loginPage);
   router.get('/cadastro', controller.registerPage);
   router.get('/api/auth/csrf', (req, res) => res.json({ csrfToken: req.session.csrfToken }));

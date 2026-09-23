@@ -5,6 +5,7 @@ import { HttpError } from '../utils/httpError.js';
 
 const isApi = req => req.path.startsWith('/api/');
 const safeUser = user => ({ id: user.id, empresa_id: user.empresa_id, nome: user.nome, email: user.email, tipo: user.tipo, ativo: user.ativo });
+const getPostLoginRedirect = user => user?.tipo === 'admin' ? '/admin' : '/conta';
 const sessionOperation = (req, method) => new Promise((resolve, reject) => req.session[method](error => error ? reject(error) : resolve()));
 
 export function accountController(service, config) {
@@ -20,11 +21,11 @@ export function accountController(service, config) {
   }
   return {
     loginPage(req, res) {
-      if (req.user) return res.redirect('/conta');
+      if (req.user) return res.redirect(getPostLoginRedirect(req.user));
       res.render('auth/login', { title: 'Entrar', changed: req.query.senha === 'alterada' });
     },
     registerPage(req, res) {
-      if (req.user) return res.redirect('/conta');
+      if (req.user) return res.redirect(getPostLoginRedirect(req.user));
       res.render('auth/register', { title: 'Criar conta', states });
     },
     async register(req, res) {
@@ -32,7 +33,7 @@ export function accountController(service, config) {
       const { user, company } = await service.register(data);
       await startSession(req, user, false);
       if (isApi(req)) return res.status(201).json({ user: safeUser(user), company, csrfToken: req.session.csrfToken });
-      res.redirect(303, '/conta');
+      res.redirect(303, getPostLoginRedirect(user));
     },
     async login(req, res) {
       let data;
@@ -41,7 +42,7 @@ export function accountController(service, config) {
       const user = await service.login(data);
       await startSession(req, user, data.lembrar);
       if (isApi(req)) return res.json({ user: safeUser(user), csrfToken: req.session.csrfToken });
-      res.redirect(303, '/conta');
+      res.redirect(303, getPostLoginRedirect(user));
     },
     async logout(req, res) {
       await sessionOperation(req, 'destroy');
