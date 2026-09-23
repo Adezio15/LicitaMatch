@@ -104,7 +104,8 @@
       <% if (alertsSaved) { %><p class="notice" role="status">Preferência de alertas salva.</p><% } %>
       <p><%= emailEnabled ? 'Receba oportunidades com alta correlação no e-mail da sua conta.' : 'O envio de e-mails ainda não foi configurado pelo administrador. Você pode salvar sua preferência.' %></p>
       <form method="post" action="/conta/alertas" class="stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label>Receber alertas<select name="alertas_email"><option value="false" <%= !user.alertas_email ? 'selected' : '' %>>Não receber</option><option value="true" <%= user.alertas_email ? 'selected' : '' %>>Receber no meu e-mail</option></select></label><button type="submit" class="button secondary">Salvar preferência</button>
+        <% const emailAlertsEnabled = user.alertas_email !== false; %>
+        <label>Receber alertas<select name="alertas_email"><option value="false" <%= !emailAlertsEnabled ? 'selected' : '' %>>Não receber</option><option value="true" <%= emailAlertsEnabled ? 'selected' : '' %>>Receber no meu e-mail</option></select></label><button type="submit" class="button secondary">Salvar preferência</button>
       </form>
     </section>
     <% if (['gestor','admin'].includes(user.tipo)) { %>
@@ -115,7 +116,8 @@
       <form method="post" action="/conta/whatsapp" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label>Seu celular com DDD<input type="tel" name="whatsapp_numero" autocomplete="tel" maxlength="30" placeholder="(84) 99999-9999" value="<%= user.whatsapp_numero || '' %>"></label>
-        <label>Receber oportunidades no WhatsApp<select name="alertas_whatsapp"><option value="false" <%= !user.alertas_whatsapp ? 'selected' : '' %>>Não receber</option><option value="true" <%= user.alertas_whatsapp ? 'selected' : '' %>>Receber no WhatsApp</option></select></label>
+        <% const whatsappAlertsEnabled = user.alertas_whatsapp !== false; %>
+        <label>Receber oportunidades no WhatsApp<select name="alertas_whatsapp"><option value="false" <%= !whatsappAlertsEnabled ? 'selected' : '' %>>Não receber</option><option value="true" <%= whatsappAlertsEnabled ? 'selected' : '' %>>Receber no WhatsApp</option></select></label>
         <label class="checkbox"><input type="checkbox" name="confirmar_whatsapp">Confirmo que este número é meu e quero receber alertas de oportunidades do LicitaMatch pelo WhatsApp.</label>
         <small class="muted">Confirme para ativar ou atualizar o recebimento. Para cancelar, escolha “Não receber” e salve. A preferência de e-mail é independente.</small>
         <button type="submit" class="button secondary">Salvar WhatsApp</button>

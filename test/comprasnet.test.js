@@ -30,7 +30,7 @@ test('normalizeComprasnetItems extrai itens válidos do portal complementar', ()
   assert.equal(items[0].modalidade, 'Pregão Eletrônico');
 });
 
-test('createComprasnetSource consulta o portal complementar e rejeita falhas de rede', async () => {
+test('createComprasnetSource consulta o portal complementar e usa fallback de scraping quando a API responde vazia', async () => {
   const okSource = createComprasnetSource({
     fetchImpl: async (url, init = {}) => {
       assert.equal(url.hostname, 'dadosabertos.compras.gov.br');
@@ -56,6 +56,27 @@ test('createComprasnetSource consulta o portal complementar e rejeita falhas de 
   assert.equal(result.count, 1);
   assert.equal(result.items[0].id, '2026/777');
 
+  const fallbackSource = createComprasnetSource({
+    fetchImpl: async (url, init = {}) => {
+      if (String(init.headers?.Accept || '').includes('text/html')) {
+        return { ok: true, headers: { get: name => name === 'content-type' ? 'text/html; charset=utf-8' : null }, text: async () => `
+          <html><body>
+            <div><span>Processo: 2026/888</span></div>
+            <div><strong>Objeto:</strong> Compra de cadeiras para a secretaria</div>
+            <div><strong>Órgão:</strong> Secretaria de Saúde</div>
+            <div><strong>Modalidade:</strong> Pregão Eletrônico</div>
+            <div><strong>Data de Abertura:</strong> 2026-09-23</div>
+          </body></html>
+        ` };
+      }
+      return { ok: true, json: async () => ({ resultado: [] }) };
+    }
+  });
+
+  const fallbackResult = await fallbackSource.fetchLatest();
+  assert.equal(fallbackResult.source, 'comprasnet');
+  assert.ok(fallbackResult.items.some(item => item.id === '2026/888' && /cadeiras/i.test(item.objeto)));
+
   const failed = createComprasnetSource({
     fetchImpl: async () => ({
       ok: false,
@@ -64,5 +85,5 @@ test('createComprasnetSource consulta o portal complementar e rejeita falhas de 
     })
   });
 
-  await assert.rejects(() => failed.fetchLatest(), /500|portal indisponível/i);
+  await assert.rejects(() => failed.fetchLatest(), /500|portal indisponível|scraping/i);
 });

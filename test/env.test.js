@@ -12,6 +12,18 @@ const production = {
 const authority = 'neon_owner:synthetic%40password%3Awith%2Fsymbols%26more@ep-example-pooler.us-east-2.aws.neon.tech:5432/neondb';
 const neonUrl = `postgresql://${authority}?sslmode=require&channel_binding=require`;
 
+test('defaults do ambiente ativam alertas e portal complementar sem bloquear desenvolvimento', () => {
+  const config = parseEnv({
+    ...production,
+    NODE_ENV: 'test',
+    DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/test',
+    SESSION_SECRET: randomBytes(48).toString('hex')
+  });
+  assert.equal(config.COMPRASNET_ENABLED, 'true');
+  assert.equal(config.EMAIL_ENABLED, 'true');
+  assert.equal(config.WHATSAPP_ENABLED, 'true');
+});
+
 test('worker exige conexão direta no Neon e SMTP completo quando habilitado', () => {
   assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,WORKER_ENABLED:'true'}), /WORKER_REQUIRES_DIRECT_CONNECTION/);
   assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,DATABASE_DIRECT_URL:neonUrl,WORKER_ENABLED:'true'}), /WORKER_REQUIRES_DIRECT_CONNECTION/);

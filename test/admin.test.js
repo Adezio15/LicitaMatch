@@ -57,6 +57,10 @@ test('admin global acessa painel geral e gestores comuns não acessam', async ()
   assert.match(adminPage.text, /Painel administrativo/i);
   assert.match(adminPage.text, /Empresa Administrativa LTDA/i);
 
+  const dashboardPage = await adminAgent.get('/conta').expect(200);
+  assert.match(dashboardPage.text, /Receber no meu e-mail/i);
+  assert.match(dashboardPage.text, /Receber no WhatsApp/i);
+
   await gestorAgent.get('/admin').expect(403);
   await gestorAgent.get('/api/admin/empresas').expect(403);
   await adminAgent.get('/api/admin/empresas').expect(200);
