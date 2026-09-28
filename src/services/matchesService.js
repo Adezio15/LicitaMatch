@@ -49,7 +49,7 @@ export async function saveMatches(database, payload = {}) {
   if (!interesseId || !licitacaoId || !empresaId) return 0;
 
   const { rows } = await database.query(`SELECT id, objeto, modalidade, unidade_gestora AS "unidadeGestora"
-    FROM licitacoes_pncp WHERE id=$1`, [licitacaoId]);
+    FROM licitacoes_pncp WHERE id=$1 AND licitacao_permitida(modalidade,uf)`, [licitacaoId]);
   const licitacao = rows[0];
   if (!licitacao) return 0;
 

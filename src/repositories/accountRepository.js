@@ -59,7 +59,7 @@ export function accountRepository(database) {
       const { rows } = await database.query(`SELECT e.*,
         (SELECT count(*)::int FROM usuarios u WHERE u.empresa_id=e.id AND u.ativo=true) AS usuarios_ativos,
         (SELECT count(*)::int FROM interesses i WHERE i.empresa_id=e.id AND i.ativo=true) AS interesses_ativos,
-        (SELECT count(*)::int FROM matches m WHERE m.empresa_id=e.id) AS oportunidades_totais
+        (SELECT count(*)::int FROM matches m JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=e.id AND licitacao_permitida(l.modalidade,l.uf)) AS oportunidades_totais
         FROM empresas e
         ORDER BY e.created_at DESC`);
       return rows;
@@ -77,15 +77,15 @@ export function accountRepository(database) {
     async getDashboard(empresaId) {
       const { rows: summaryRows } = await database.query(`SELECT
         (SELECT count(*)::int FROM interesses WHERE empresa_id=$1 AND ativo=true) AS interesses_ativos,
-        (SELECT count(*)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0) AS oportunidades_totais,
-        (SELECT COALESCE(max(score), 0)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0) AS maior_score,
+        (SELECT count(*)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)) AS oportunidades_totais,
+        (SELECT COALESCE(max(score), 0)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)) AS maior_score,
         (SELECT count(*)::int FROM usuarios WHERE empresa_id=$1 AND ativo=true) AS usuarios_ativos`, [empresaId]);
       const { rows: matchesRows } = await database.query(`SELECT m.id, m.score, m.status, m.empresa_id,
         i.titulo AS interesse_titulo, l.objeto, l.modalidade, l.unidade_gestora, m.created_at
         FROM matches m
         JOIN interesses i ON i.id = m.interesse_id
         JOIN licitacoes_pncp l ON l.id = m.licitacao_id
-        WHERE m.empresa_id=$1 AND i.empresa_id=$1 AND i.ativo=true AND m.score>0
+        WHERE m.empresa_id=$1 AND i.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)
         ORDER BY m.score DESC, m.created_at DESC LIMIT 5`, [empresaId]);
       return { ...(summaryRows[0] || {}), topMatches: matchesRows };
     },

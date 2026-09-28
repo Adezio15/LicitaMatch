@@ -1,4 +1,5 @@
 import { fetchJson, queryWindow, unitName } from './httpSource.js';
+import { normalizeUf, pncpModalidade } from './procurementMetadata.js';
 const DEFAULT_PNCP_URL = 'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao';
 
 export function normalizePncpItems(payload) {
@@ -8,9 +9,10 @@ export function normalizePncpItems(payload) {
     const objeto = String(item?.objetoCompra || item?.objeto || item?.descricao || item?.titulo || '').trim();
     const dataAbertura = item?.dataAberturaProposta || item?.dataAbertura || item?.data_abertura || item?.dataPublicacaoPncp || item?.dataPublicacao || item?.data_publicacao;
     const unidadeGestora = unitName(item?.unidadeOrgao || item?.unidadeGestora || item?.unidade_gestora || item?.orgaoEntidade);
-    const modalidade = String(item?.modalidadeNome || item?.modalidade || 'N/D').trim();
+    const modalidade = pncpModalidade(item?.modalidadeId, item?.modalidadeNome || item?.modalidade);
+    const uf = normalizeUf(item?.unidadeOrgao?.ufSigla || item?.uf);
     if (!id || !objeto || !unidadeGestora || !dataAbertura || Number.isNaN(Date.parse(dataAbertura))) return null;
-    return { id,objeto,dataAbertura,unidadeGestora,modalidade: modalidade || 'N/D' };
+    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(uf ? { uf } : {}) };
   }).filter(Boolean);
 }
 

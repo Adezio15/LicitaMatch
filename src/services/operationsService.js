@@ -54,9 +54,10 @@ export function createOperationsService({ database, config, logger, registry, em
       AND u.whatsapp_consentimento_em IS NOT NULL AND u.tipo IN ('gestor','admin')))`;
     await client.query(`INSERT INTO alertas (match_id,usuario_id,canal)
       SELECT m.id,u.id,$2 FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
+      JOIN licitacoes_pncp l ON l.id=m.licitacao_id
       JOIN empresas e ON e.id=m.empresa_id JOIN usuarios u ON u.empresa_id=m.empresa_id
       WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
-      AND e.status='ativo' AND u.ativo=true AND ${preference}
+      AND e.status='ativo' AND u.ativo=true AND ${preference} AND licitacao_permitida(l.modalidade,l.uf)
       ON CONFLICT (match_id,usuario_id,canal) DO NOTHING`, [config.ALERT_MIN_SCORE,channel]);
     const { rows } = await client.query(`SELECT a.id,u.email,u.whatsapp_numero,e.razao_social,i.titulo,m.score,l.objeto,l.modalidade,l.unidade_gestora
       FROM alertas a JOIN matches m ON m.id=a.match_id
@@ -65,7 +66,7 @@ export function createOperationsService({ database, config, logger, registry, em
       JOIN empresas e ON e.id=u.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
       WHERE a.status='pendente' AND a.canal=$2 AND a.proxima_tentativa<=now() AND a.tentativas<5
       AND u.ativo=true AND ${preference} AND e.status='ativo' AND i.ativo=true
-      AND m.score >= $1 AND m.status IN ('novo','aceito') ORDER BY a.id LIMIT 25`, [config.ALERT_MIN_SCORE,channel]);
+      AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf) ORDER BY a.id LIMIT 25`, [config.ALERT_MIN_SCORE,channel]);
     let sent = 0, failed = 0;
     for (const row of rows) {
       if (stopped) break;

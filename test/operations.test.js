@@ -17,7 +17,7 @@ import { correlateOpportunities } from '../src/services/opportunityService.js';
 
 const config = parseEnv({ NODE_ENV: 'test', DATABASE_URL: 'postgresql://test:test@localhost/test', SESSION_SECRET: 'automated-tests-only-'.repeat(4), PNCP_MODALIDADES: '6', COMPRASNET_MODALIDADES: '5', SYNC_MAX_PAGES: 1 });
 const logger = createLogger('silent');
-const item = { id:'12345678000199-1-000001-2026',objeto:'Compra de notebooks',unidadeGestora:'Secretaria de Educação',dataAbertura:'2026-09-25T12:00:00Z',modalidade:'Pregão' };
+const item = { id:'12345678000199-1-000001-2026',objeto:'Compra de notebooks',unidadeGestora:'Secretaria de Educação',dataAbertura:'2026-09-25T12:00:00Z',modalidade:'Pregão Eletrônico' };
 
 test('adapters leem Response real uma única vez e usam campos e parâmetros oficiais', async () => {
   const pncp = createPncpSource({ fetchImpl: async url => {

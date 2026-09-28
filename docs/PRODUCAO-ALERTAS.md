@@ -27,6 +27,10 @@ O gestor ou administrador precisa salvar o celular e confirmar o recebimento na 
 
 ## Verificação após publicar
 
+Oportunidades e alertas seguem a regra regional: pregão eletrônico em todo o Brasil; pregão presencial apenas em RN e PB. Outras modalidades e pregões sem forma identificada ficam fora. Presenciais sem UF confirmada também ficam fora. A UF é a da unidade contratante informada pela fonte, não a da empresa usuária.
+
+A migration `009_regional_pregao.sql` adiciona a UF e a regra compartilhada. Registros antigos são preservados; uma nova coleta do mesmo código externo complementa a UF. Enquanto não forem reimportados, presenciais antigos sem UF não aparecem nem geram envios. Alertas já enviados permanecem no histórico; pendentes fora da regra não são enviados.
+
 Abra `/admin/operacao`: os diagnósticos mostram nomes das configurações ausentes, sem expor valores. Confira `WORKER_ENABLED`, as tarefas `alertas` e `alertas_whatsapp`, a fila e os logs de falhas. Os alertas exigem interesses ativos, correspondências com score mínimo (padrão 70) e destinatários ativos com preferência habilitada. O status enviado significa aceitação pelo provedor, não entrega ou leitura.
 
 Tentativas pendentes são repetidas a cada 15 minutos, até cinco tentativas. Alertas já marcados como `falhou` precisam de recuperação operacional após corrigir a causa; uma publicação não os reenvia automaticamente.

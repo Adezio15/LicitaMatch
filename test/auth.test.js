@@ -165,9 +165,9 @@ test('autenticação e isolamento com SQL e sessões persistidas', async t => {
         [interests[0].id, licitacoes[0].id, userA.empresa_id, 90, 'novo', interests[1].id, licitacoes[1].id, 75, 'revisado']);
       const page = await a.get('/conta').expect(200);
       assert.match(page.text, /Interesses ativos/);
-      assert.match(page.text, /Infraestrutura e logística/);
-      assert.match(page.text, /90%/);
-      assert.match(page.text, /Contratação de pavimentação e manutenção de vias urbanas/);
+      assert.match(page.text, /Mobilidade urbana/);
+      assert.match(page.text, /75%/);
+      assert.doesNotMatch(page.text, /Contratação de pavimentação e manutenção de vias urbanas/);
     });
 
     await t.test('usuário comum não administra empresa nem equipe; desativação revoga acesso', async () => {

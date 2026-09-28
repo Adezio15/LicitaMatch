@@ -39,10 +39,10 @@ export async function correlateOpportunities(database, empresaId = null) {
     AND ($1::bigint IS NULL OR i.empresa_id=$1)`, [empresaId]);
   let cursor = '0', created = 0;
   while (interests.length) {
-    const { rows } = await database.query('SELECT * FROM licitacoes_pncp WHERE id>$1 ORDER BY id LIMIT 250', [cursor]);
+    const { rows } = await database.query('SELECT *, licitacao_permitida(modalidade,uf) AS permitida FROM licitacoes_pncp WHERE id>$1 ORDER BY id LIMIT 250', [cursor]);
     if (!rows.length) break;
     for (const item of rows) for (const interest of interests) {
-      const score = matchLicitacao(item, interest);
+      const score = item.permitida ? matchLicitacao(item, interest) : 0;
       if (!score) {
         await database.query('UPDATE matches SET score=0 WHERE interesse_id=$1 AND licitacao_id=$2 AND empresa_id=$3 AND score<>0', [interest.id,item.id,interest.empresa_id]);
         continue;
@@ -76,12 +76,12 @@ export function opportunityService(database) {
       const values = [empresaId,filters.status,filters.q,filters.score];
       const where = `m.empresa_id=$1 AND i.empresa_id=$1 AND i.ativo=true
         AND ($2='' OR m.status=$2) AND ($3='' OR strpos(lower(l.objeto),lower($3))>0)
-        AND m.score > 0 AND m.score >= $4`;
+        AND m.score > 0 AND m.score >= $4 AND licitacao_permitida(l.modalidade,l.uf)`;
       const from = `FROM matches m JOIN interesses i ON i.id=m.interesse_id
         JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE ${where}`;
       const total = (await database.query(`SELECT count(*)::int AS total ${from}`, values)).rows[0].total;
       const { rows } = await database.query(`SELECT m.id,m.score,m.status,i.titulo AS interesse_titulo,
-        l.codigo_externo,l.objeto,l.data_abertura,l.unidade_gestora,l.modalidade,l.origem,
+        l.codigo_externo,l.objeto,l.data_abertura,l.unidade_gestora,l.modalidade,l.origem,l.uf,
         m.id AS match_id ${from} ORDER BY m.score DESC,m.id DESC LIMIT 20 OFFSET $5`, [...values,(filters.page-1)*20]);
       return { items: rows, total, pages: Math.max(1,Math.ceil(total/20)), filters };
     },

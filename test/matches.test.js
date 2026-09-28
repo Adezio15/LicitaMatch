@@ -24,7 +24,7 @@ test('saveMatches salva correlação de licitação com interesse e evita duplic
   try {
     for (const migration of await readMigrations()) await db.exec(migration.sql);
     await db.exec(`INSERT INTO licitacoes_pncp (codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem)
-      VALUES ('MATCH-1', 'Compra de notebooks para a área de tecnologia', '2026-10-01T12:00:00Z', 'SEFAZ', 'Pregão', 'pncp')`);
+      VALUES ('MATCH-1', 'Compra de notebooks para a área de tecnologia', '2026-10-01T12:00:00Z', 'SEFAZ', 'Pregão Eletrônico', 'pncp')`);
 
     const created = await saveMatches(client, {
       interesseId: 1,

@@ -69,7 +69,7 @@ test('fila envia por canal, isola falhas, respeita responsáveis e cancelamento,
       (2,'Responsável B','b@example.test','$2b$12$'||repeat('x',53),'gestor',true),
       (1,'Leitor','reader@example.test','$2b$12$'||repeat('x',53),'usuario',false);
       INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Notebooks',ARRAY['notebook']);
-      INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora) VALUES ('WA-1','Compra de notebooks',now(),'Secretaria');
+      INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade) VALUES ('WA-1','Compra de notebooks',now(),'Secretaria','Pregão Eletrônico');
       INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,1,1,100);
       INSERT INTO alertas (match_id,usuario_id,status) VALUES (1,1,'enviado');`);
     await db.exec(migrations.at(-1).sql);
