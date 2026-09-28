@@ -51,6 +51,8 @@ const schema = z.object({
   PNCP_MODALIDADES: z.string().regex(/^\d+(,\d+)*$/).default('4,6,7,8,9,12'),
   COMPRASNET_MODALIDADES: z.string().regex(/^\d+(,\d+)*$/).default('3,5,6,7'),
   EMAIL_ENABLED: z.enum(['true','false']).default('false'),
+  EMAIL_PROVIDER: z.enum(['smtp','resend']).default('smtp'),
+  RESEND_API_KEY: z.string().trim().min(1).optional(),
   WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
   WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1).optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).optional(),
@@ -76,10 +78,10 @@ const schema = z.object({
       ctx.addIssue({code:'custom',path:['DATABASE_DIRECT_URL'],message:'WORKER_REQUIRES_DIRECT_CONNECTION'});
     }
   }
-  if (config.NODE_ENV === 'production' && config.EMAIL_ENABLED === 'true') for (const field of ['EMAIL_FROM','SMTP_HOST','SMTP_USER','SMTP_PASSWORD']) {
+  if (config.EMAIL_ENABLED === 'true') for (const field of config.EMAIL_PROVIDER === 'resend' ? ['EMAIL_FROM','RESEND_API_KEY'] : ['EMAIL_FROM','SMTP_HOST','SMTP_USER','SMTP_PASSWORD']) {
     if (!config[field]) ctx.addIssue({ code: 'custom', path: [field], message: 'MISSING' });
   }
-  if (config.NODE_ENV === 'production' && config.WHATSAPP_ENABLED === 'true') for (const field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) {
+  if (config.WHATSAPP_ENABLED === 'true') for (const field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) {
     if (!config[field]) ctx.addIssue({code:'custom',path:[field],message:'MISSING'});
   }
 }).refine(config => config.NODE_ENV !== 'production' || config.LOCAL_DATABASE === 'false', {
@@ -88,15 +90,12 @@ const schema = z.object({
 
 export function parseEnv(input) {
   const normalizedInput = { ...input };
-  if (normalizedInput.NODE_ENV === 'production') {
-    if (normalizedInput.COMPRASNET_ENABLED === undefined) normalizedInput.COMPRASNET_ENABLED = 'false';
-    if (normalizedInput.EMAIL_ENABLED === undefined) normalizedInput.EMAIL_ENABLED = 'false';
-    if (normalizedInput.WHATSAPP_ENABLED === undefined) normalizedInput.WHATSAPP_ENABLED = 'false';
-  } else {
-    if (normalizedInput.COMPRASNET_ENABLED === undefined) normalizedInput.COMPRASNET_ENABLED = 'true';
-    if (normalizedInput.EMAIL_ENABLED === undefined) normalizedInput.EMAIL_ENABLED = 'true';
-    if (normalizedInput.WHATSAPP_ENABLED === undefined) normalizedInput.WHATSAPP_ENABLED = 'true';
-  }
+  normalizedInput.COMPRASNET_ENABLED ??= 'true';
+  normalizedInput.EMAIL_PROVIDER ??= normalizedInput.RESEND_API_KEY ? 'resend' : 'smtp';
+  for (const [flag, fields] of Object.entries({
+    EMAIL_ENABLED: normalizedInput.EMAIL_PROVIDER === 'resend' ? ['EMAIL_FROM','RESEND_API_KEY'] : ['EMAIL_FROM', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'],
+    WHATSAPP_ENABLED: ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION', 'WHATSAPP_TEMPLATE_NAME']
+  })) normalizedInput[flag] ??= fields.every(field => typeof normalizedInput[field] === 'string' && normalizedInput[field].trim()) ? 'true' : 'false';
   const result = schema.safeParse(normalizedInput);
   if (!result.success) {
     // Nunca incluir valores recebidos: URLs podem conter credenciais.

@@ -69,7 +69,11 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     await a.patch('/api/oportunidades/'+id).set('X-CSRF-Token',first.csrfToken).send({status:'aceito'}).expect(200);
     assert.equal((await a.get('/api/oportunidades?status=novo').expect(200)).body.total,0);
     await a.get('/api/oportunidades?score=101').expect(422);
-    for (const path of ['/conta','/interesses','/oportunidades']) await a.get(path).expect(200);
+    for (const path of ['/conta','/interesses','/oportunidades','/empresa','/usuarios']) {
+      const page = await a.get(path).expect(200);
+      assert.equal((page.text.match(/class="sidebar"/g) || []).length, 1);
+      assert.match(page.text, new RegExp('href="' + path + '" aria-current="page"'));
+    }
     await a.get('/admin/operacao').expect(403);
     await a.post('/api/conta/alertas').set('X-CSRF-Token',first.csrfToken).send({alertas_email:true}).expect(200);
     const whatsapp={whatsapp_numero:'(84) 99999-9999',alertas_whatsapp:true,confirmar_whatsapp:true};
@@ -79,7 +83,7 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send(whatsapp).expect(200);
     const preferences=(await db.query('SELECT whatsapp_numero,alertas_whatsapp FROM usuarios WHERE id=$1',[first.user.id])).rows[0];
     assert.deepEqual(preferences,{whatsapp_numero:'+5584999999999',alertas_whatsapp:true});
-    assert.equal((await db.query('SELECT alertas_whatsapp FROM usuarios WHERE id=$1',[second.user.id])).rows[0].alertas_whatsapp,false);
+    assert.equal((await db.query('SELECT whatsapp_consentimento_em FROM usuarios WHERE id=$1',[second.user.id])).rows[0].whatsapp_consentimento_em,null);
     const whatsappPage=await a.get('/conta').expect(200);
     assert.match(whatsappPage.text,/Salvar WhatsApp/);
     await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send({...whatsapp,alertas_whatsapp:false,confirmar_whatsapp:false}).expect(200);
@@ -124,6 +128,7 @@ test('worker mantém cursor, isola falhas, deduplica fontes, cria matches e não
     const pending = worker.runOnce();
     assert.equal(worker.runOnce(),pending);
     await pending;
+    assert.equal(sends, 1, 'nova importação deve gerar alerta no mesmo ciclo');
     assert.equal((await db.query("SELECT cursor FROM tarefas WHERE nome='sync:pncp:6'")).rows[0].cursor.page,2);
     assert.equal((await db.query("SELECT estado FROM tarefas WHERE nome='sync:comprasnet:5'")).rows[0].estado,'falhou');
     assert.equal((await db.query('SELECT count(*)::int AS n FROM matches')).rows[0].n,1);

@@ -30,7 +30,7 @@ test('normalizeComprasnetItems extrai itens válidos do portal complementar', ()
   assert.equal(items[0].modalidade, 'Pregão Eletrônico');
 });
 
-test('createComprasnetSource consulta o portal complementar e usa fallback de scraping quando a API responde vazia', async () => {
+test('createComprasnetSource consulta o portal complementar e aceita consulta vazia sem scraping', async () => {
   const okSource = createComprasnetSource({
     fetchImpl: async (url, init = {}) => {
       assert.equal(url.hostname, 'dadosabertos.compras.gov.br');
@@ -75,7 +75,7 @@ test('createComprasnetSource consulta o portal complementar e usa fallback de sc
 
   const fallbackResult = await fallbackSource.fetchLatest();
   assert.equal(fallbackResult.source, 'comprasnet');
-  assert.ok(fallbackResult.items.some(item => item.id === '2026/888' && /cadeiras/i.test(item.objeto)));
+  assert.deepEqual(fallbackResult.items, []);
 
   const failed = createComprasnetSource({
     fetchImpl: async () => ({

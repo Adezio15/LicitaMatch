@@ -9,3 +9,9 @@
 .auth-story>.brand-logo{width:260px;align-self:flex-start}
 .sidebar-brand-wrap .brand-logo{width:100%;max-width:190px;margin:0 auto}
 @media(max-width:650px){.topbar>.brand-logo{width:120px}.auth-story>.brand-logo{width:190px}.page>.brand-logo{width:160px}.sidebar-brand-wrap .brand-logo{max-width:150px}}
+
+/* Shared account layout. */
+.dashboard-shell>.sidebar{align-self:start;position:sticky;top:24px;max-height:calc(100dvh - 48px);overflow-y:auto}
+.dashboard-shell>.page{width:100%;max-width:none;margin:0;padding:0;min-width:0}
+@media(max-width:900px){.dashboard-shell>.sidebar{position:static;max-height:none}.sidebar-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.dashboard-shell{padding:0 16px;margin:16px auto;gap:16px}}

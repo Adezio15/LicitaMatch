@@ -4,7 +4,7 @@ import { createComprasnetSource } from './sources/comprasnetSource.js';
 import { createSourceRegistry } from './sources/sourceRegistry.js';
 import { persistPncpItems } from './pncpPersistenceService.js';
 import { correlateOpportunities } from './opportunityService.js';
-import { createEmailService } from './emailService.js';
+import { createEmailService, createResendTransport } from './emailService.js';
 import { safeError } from '../utils/safeError.js';
 import { createWhatsAppService } from './whatsappService.js';
 
@@ -15,7 +15,7 @@ export function createOperationsService({ database, config, logger, registry, em
   });
   let transport;
   if (!emailService && config.EMAIL_ENABLED === 'true') {
-    transport = nodemailer.createTransport({ host: config.SMTP_HOST, port: config.SMTP_PORT,
+    transport = config.EMAIL_PROVIDER === 'resend' ? createResendTransport({ apiKey: config.RESEND_API_KEY }) : nodemailer.createTransport({ host: config.SMTP_HOST, port: config.SMTP_PORT,
       secure: config.SMTP_PORT === 465, requireTLS: true,
       auth: { user: config.SMTP_USER, pass: config.SMTP_PASSWORD },
       connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000,
@@ -104,6 +104,9 @@ export function createOperationsService({ database, config, logger, registry, em
         await client.query(`UPDATE tarefas SET estado='executando',ultima_execucao=now(),
           proxima_execucao=now()+($2 * interval '1 minute') WHERE nome=$1`, [definition.name,minutes]);
         try {
+          if (definition.name.startsWith('alertas') && results.some(result => result.inserted > 0) && !results.some(result => result.name === 'imported-matches')) {
+            results.push({ name: 'imported-matches', matches: await correlateOpportunities(client) });
+          }
           const result = definition.source ? await synchronize(client,definition,state)
             : definition.name === 'matches' ? { matches: await correlateOpportunities(client) } : await alerts(client,definition.name==='alertas_whatsapp' ? 'whatsapp' : 'email');
           await client.query(`UPDATE tarefas SET estado=$3,ultimo_sucesso=now(),resumo=$2,
@@ -117,7 +120,7 @@ export function createOperationsService({ database, config, logger, registry, em
         }
       }
       // New imports become visible in this same cycle.
-      if (results.some(result => result.inserted > 0)) await correlateOpportunities(client);
+      if (results.some(result => result.inserted > 0) && !results.some(result => result.name === 'imported-matches')) await correlateOpportunities(client);
       return { results };
     } finally {
       if (locked) {
@@ -126,6 +129,13 @@ export function createOperationsService({ database, config, logger, registry, em
       }
       client.release();
     }
+  }
+  function channelDiagnostic(flag, fields) {
+    const missing = fields.filter(field => !config[field]);
+    if (missing.length) return 'Configuração ausente: ' + missing.join(', ') + '.';
+    if (config[flag] !== 'true') return flag + '=false desativa o envio.';
+    if (config.WORKER_ENABLED !== 'true') return 'WORKER_ENABLED=false impede o processamento dos alertas.';
+    return 'Pronto para envio. Verifique a fila e as preferências dos destinatários.';
   }
   const service = {
     runOnce() {
@@ -144,12 +154,13 @@ export function createOperationsService({ database, config, logger, registry, em
       stopped = true;
       clearInterval(timer); timer = null;
       await pending;
-      transport?.close();
+      transport?.close?.();
     },
     async overview() {
       const tasks = (await database.query('SELECT * FROM tarefas ORDER BY nome')).rows;
       const alerts = (await database.query('SELECT canal,status,count(*)::int AS total FROM alertas GROUP BY canal,status ORDER BY canal,status')).rows;
       return { tasks,alerts,workerEnabled: config.WORKER_ENABLED === 'true',emailEnabled: config.EMAIL_ENABLED === 'true',whatsappEnabled:config.WHATSAPP_ENABLED==='true',
+        diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', config.EMAIL_PROVIDER === 'resend' ? ['EMAIL_FROM','RESEND_API_KEY'] : ['EMAIL_FROM','SMTP_HOST','SMTP_USER','SMTP_PASSWORD']), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) },
         sources: registry.listSources(true).map(({ id,name,enabled }) => ({ id,name,enabled })) };
     },
     async schedule() {

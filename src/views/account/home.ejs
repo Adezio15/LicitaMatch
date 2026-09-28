@@ -1,26 +1,5 @@
 <%- include('../partials/head') %>
 <%- include('../partials/nav') %>
-<div class="dashboard-shell">
-  <aside class="sidebar" aria-label="Menu lateral do dashboard">
-    <div class="sidebar-brand-wrap">
-      <%- include('../partials/logo', { href: '/conta' }) %>
-    </div>
-    <nav class="sidebar-nav" aria-label="Navegação principal">
-      <a class="nav-link active" href="/conta">Dashboard</a>
-      <a class="nav-link" href="/interesses">Interesses</a>
-      <a class="nav-link" href="/oportunidades">Oportunidades</a>
-      <a class="nav-link" href="/empresa">Empresa</a>
-      <% if (['gestor', 'admin'].includes(user.tipo)) { %><a class="nav-link" href="/usuarios">Usuários</a><% } %>
-      <% if (user.tipo === 'admin') { %><a class="nav-link" href="/admin">Admin</a><% } %>
-      <a class="nav-link" href="/conta#seguranca">Segurança</a>
-    </nav>
-    <div class="sidebar-card">
-      <span class="eyebrow small">Empresa</span>
-      <h3><%= user.nome_fantasia || user.razao_social || 'Sua empresa' %></h3>
-      <p class="muted"><%= { usuario: 'Usuário', gestor: 'Gestor', admin: 'Administrador' }[user.tipo] %> · <%= user.empresa_status || 'Ativa' %></p>
-    </div>
-  </aside>
-
   <main class="page dashboard-page">
     <header class="page-heading dashboard-header">
       <div>

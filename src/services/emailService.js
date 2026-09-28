@@ -1,5 +1,24 @@
 import { alertContent } from './alertContent.js';
 
+export function createResendTransport({ apiKey, fetchImpl = globalThis.fetch }) {
+  return { async sendMail(payload) {
+    if (!apiKey) throw new Error('Resend não configurado.');
+    let response;
+    try {
+      response = await fetchImpl('https://api.resend.com/emails', {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, to: [payload.to] })
+      });
+    } catch { throw new Error('Não foi possível conectar ao provedor de e-mail HTTPS.'); }
+    if (!response.ok) throw new Error(`Provedor de e-mail recusou a solicitação (HTTP ${Number(response.status) || 500}).`);
+    let result;
+    try { result = await response.json(); } catch { throw new Error('Resposta inválida do provedor de e-mail.'); }
+    if (result.error || typeof result.id !== 'string' || !result.id) throw new Error('Provedor de e-mail não confirmou a aceitação.');
+    return { accepted: [payload.to], messageId: result.id };
+  } };
+}
+
 function isValidEmail(value) {
   return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -58,7 +77,10 @@ export function createEmailService({ transport, from = 'alertas@licitamatch.loca
       };
 
       const result = await transport.sendMail(payload);
-      return { accepted: true, ...result, message: payload };
+      if (result?.accepted === false || (Array.isArray(result?.accepted) && !result.accepted.length) || result?.rejected?.length) {
+        throw new Error('O servidor SMTP não aceitou o destinatário.');
+      }
+      return { ...result, accepted: true, message: payload };
     }
   };
 }

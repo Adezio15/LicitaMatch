@@ -4,6 +4,8 @@
 <section class="panel"><h2>Processamento <%= data.workerEnabled ? 'ativo' : 'desativado' %></h2>
 <p>E-mail: <%= data.emailEnabled ? 'configurado' : 'desativado' %>. Os alertas exigem a adesão de cada usuário.</p>
 <p>WhatsApp: <%= data.whatsappEnabled ? 'configurado' : 'desativado' %>. Disponível aos responsáveis que ativarem o recebimento na própria conta.</p>
+<p class="muted"><%= data.diagnostics.email %></p>
+<p class="muted"><%= data.diagnostics.whatsapp %></p>
 <% if (data.workerEnabled) { %><form method="post" action="/admin/operacao/sincronizar"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="button">Atualizar fontes e oportunidades</button></form><% } %>
 </section>
 <section class="panel section-gap"><h2>Fontes</h2><% for (const source of data.sources) { %><p><strong><%= source.name %></strong> — <%= source.enabled ? 'Ativa' : 'Desativada' %></p><% } %></section>
@@ -13,4 +15,5 @@
 <% for (const task of data.tasks) { %><tr><td><%= task.nome %></td><td><%= states[task.estado] || task.estado %></td><td><%= format(task.ultimo_sucesso) %></td><td><%= format(task.proxima_execucao) %></td><td><% if (task.resumo.inserted !== undefined) { %><%= task.resumo.inserted %> importações em <%= task.resumo.pages %> páginas<% } else if (task.resumo.matches !== undefined) { %><%= task.resumo.matches %> correlações atualizadas<% } else if (task.resumo.sent !== undefined) { %><%= task.resumo.sent %> enviados; <%= task.resumo.failed %> falhas<% } %><% if (task.cursor.page) { %> · Continua na página <%= task.cursor.page %><% } %></td></tr><% } %>
 </tbody></table></div><% } %></section>
 <section class="panel section-gap"><h2>Fila de alertas</h2><p class="muted">“Enviado” indica aceitação pelo provedor, não confirmação de entrega ou leitura.</p><% if (!data.alerts.length) { %><p>Nenhum alerta na fila.</p><% } %><% for (const item of data.alerts) { %><p><%= item.canal==='whatsapp' ? 'WhatsApp' : 'E-mail' %> — <%= item.status %>: <%= item.total %></p><% } %></section>
-</main><%- include('../partials/footer') %>
+</main></div>
+<%- include('../partials/footer') %>

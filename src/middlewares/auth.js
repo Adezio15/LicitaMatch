@@ -4,6 +4,7 @@ import { SESSION_COOKIE, cookieOptions } from '../config/session.js';
 export function loadUser(repository, config) {
   return async (req, res, next) => {
     res.locals.user = null;
+    res.locals.currentPath = req.path;
     if (!req.session.userId) return next();
     const user = await repository.findSessionUser(req.session.userId, req.session.empresaId);
     if (!user || !user.ativo || user.empresa_status !== 'ativo' || user.auth_version !== req.session.authVersion || !(req.session.expiresAt > Date.now())) {

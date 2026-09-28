@@ -76,7 +76,7 @@ test('verificação somente leitura identifica migrations e tabelas ausentes e c
     await assert.rejects(checkDatabase(readonly), error => error.code === 'DATABASE_SCHEMA_MISMATCH' && error.message.includes('sessoes'));
     const migrations = await readMigrations();
     await runMigrations(migrationClient, migrations);
-    assert.deepEqual(await checkDatabase(readonly), { connection: 'ok', tables: 9, migrations: 6 });
+    assert.deepEqual(await checkDatabase(readonly), { connection: 'ok', tables: 9, migrations: migrations.length });
     await db.query("UPDATE schema_migrations SET checksum='changed' WHERE name=$1", [migrations[0].name]);
     await assert.rejects(checkDatabase(readonly), /checksums alterados: 001_foundation.sql/);
     await db.query('UPDATE schema_migrations SET checksum=$1 WHERE name=$2', [migrations[0].checksum, migrations[0].name]);
@@ -104,7 +104,7 @@ test('banco parcialmente migrado recebe somente migrations pendentes e preserva 
     assert.deepEqual(before.missingTables, ['licitacoes_pncp', 'interesses', 'matches', 'tarefas', 'alertas']);
     assert.deepEqual(before.pending, migrations.slice(2).map(migration => migration.name));
     assert.deepEqual(await runMigrations(client, migrations), before.pending);
-    assert.deepEqual(await checkDatabase(db), { connection: 'ok', tables: 9, migrations: 6 });
+    assert.deepEqual(await checkDatabase(db), { connection: 'ok', tables: 9, migrations: migrations.length });
     assert.deepEqual(await runMigrations(client, migrations), []);
     const { rows } = await db.query('SELECT razao_social FROM empresas');
     assert.deepEqual(rows, [{ razao_social: 'Empresa existente' }]);

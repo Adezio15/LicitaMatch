@@ -30,15 +30,9 @@ export function createComprasnetSource({ fetchImpl = globalThis.fetch, baseUrl =
     try {
       const payload = await fetchJson(fetchImpl,url,'Portal complementar');
       const records = Array.isArray(payload) ? payload : payload?.resultado || payload?.itens || payload?.dados || [];
-      if (!Array.isArray(records) || !records.length) {
-        const fallback = await scrapeComprasnetFallback({ fetchImpl, baseUrl: url.toString(), page, pageSize });
-        return fallback;
-      }
+      if (!Array.isArray(records)) throw new Error('Payload inválido do Compras.gov.br.');
+      if (!records.length) return { source: 'comprasnet', page, pageSize, count: 0, items: [], totalPages: Number(payload.totalPaginas || 0), hasMore: false };
       const items = normalizeComprasnetItems(payload);
-      if (!items.length) {
-        const fallback = await scrapeComprasnetFallback({ fetchImpl, baseUrl: url.toString(), page, pageSize });
-        return fallback;
-      }
       return { source: 'comprasnet',page,pageSize,count: items.length,items,
         totalPages: Number(payload.totalPaginas ?? page), hasMore: payload.totalPaginas ? page < Number(payload.totalPaginas) : false };
     } catch (error) {

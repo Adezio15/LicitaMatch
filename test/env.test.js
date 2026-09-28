@@ -12,7 +12,7 @@ const production = {
 const authority = 'neon_owner:synthetic%40password%3Awith%2Fsymbols%26more@ep-example-pooler.us-east-2.aws.neon.tech:5432/neondb';
 const neonUrl = `postgresql://${authority}?sslmode=require&channel_binding=require`;
 
-test('defaults do ambiente ativam alertas e portal complementar sem bloquear desenvolvimento', () => {
+test('defaults ativam Compras.gov e aguardam credenciais dos alertas', () => {
   const config = parseEnv({
     ...production,
     NODE_ENV: 'test',
@@ -20,8 +20,8 @@ test('defaults do ambiente ativam alertas e portal complementar sem bloquear des
     SESSION_SECRET: randomBytes(48).toString('hex')
   });
   assert.equal(config.COMPRASNET_ENABLED, 'true');
-  assert.equal(config.EMAIL_ENABLED, 'true');
-  assert.equal(config.WHATSAPP_ENABLED, 'true');
+  assert.equal(config.EMAIL_ENABLED, 'false');
+  assert.equal(config.WHATSAPP_ENABLED, 'false');
 });
 
 test('worker exige conexão direta no Neon e SMTP completo quando habilitado', () => {
@@ -29,6 +29,22 @@ test('worker exige conexão direta no Neon e SMTP completo quando habilitado', (
   assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,DATABASE_DIRECT_URL:neonUrl,WORKER_ENABLED:'true'}), /WORKER_REQUIRES_DIRECT_CONNECTION/);
   assert.equal(parseEnv({...production,DATABASE_URL:neonUrl,DATABASE_DIRECT_URL:neonUrl.replace('-pooler',''),WORKER_ENABLED:'true'}).WORKER_ENABLED,'true');
   assert.throws(() => parseEnv({...production,DATABASE_URL:neonUrl,EMAIL_ENABLED:'true'}), /SMTP_HOST/);
+});
+
+test('produção ativa Compras.gov por padrão e alertas somente com credenciais completas', () => {
+  const base = { ...production, DATABASE_URL: neonUrl };
+  assert.equal(parseEnv(base).COMPRASNET_ENABLED, 'true');
+  assert.equal(parseEnv({ ...base, COMPRASNET_ENABLED: 'false' }).COMPRASNET_ENABLED, 'false');
+  const smtp = { EMAIL_FROM: 'alerts@example.test', SMTP_HOST: 'smtp.example.test', SMTP_USER: 'test', SMTP_PASSWORD: 'synthetic' };
+  assert.equal(parseEnv({ ...base, ...smtp }).EMAIL_ENABLED, 'true');
+  assert.equal(parseEnv({ ...base, ...smtp, EMAIL_ENABLED: 'false' }).EMAIL_ENABLED, 'false');
+  const resend = parseEnv({ ...base, EMAIL_FROM: 'alerts@example.test', RESEND_API_KEY: 'synthetic' });
+  assert.equal(resend.EMAIL_ENABLED, 'true');
+  assert.equal(resend.EMAIL_PROVIDER, 'resend');
+  assert.throws(() => parseEnv({ ...base, EMAIL_ENABLED: 'true', EMAIL_PROVIDER: 'resend', EMAIL_FROM: 'alerts@example.test' }), /RESEND_API_KEY/);
+  const whatsapp = { WHATSAPP_ACCESS_TOKEN: 'synthetic', WHATSAPP_PHONE_NUMBER_ID: '123', WHATSAPP_API_VERSION: 'v23.0', WHATSAPP_TEMPLATE_NAME: 'alerta' };
+  assert.equal(parseEnv({ ...base, ...whatsapp }).WHATSAPP_ENABLED, 'true');
+  assert.equal(parseEnv({ ...base, ...whatsapp, WHATSAPP_ENABLED: 'false' }).WHATSAPP_ENABLED, 'false');
 });
 
 test('produção aceita protocolos PostgreSQL e parâmetros Neon sem alterar a URL', () => {

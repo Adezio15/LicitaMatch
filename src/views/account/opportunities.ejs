@@ -22,4 +22,5 @@
     </article>
   <% } %>
   <nav aria-label="Paginação" class="section-gap"><% if (filters.page>1) { %><a class="button secondary" href="?page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Anterior</a><% } %> <span>Página <%= filters.page %> de <%= pages %></span> <% if (filters.page<pages) { %><a class="button secondary" href="?page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Próxima</a><% } %></nav>
-</main><%- include('../partials/footer') %>
+</main></div>
+<%- include('../partials/footer') %>
