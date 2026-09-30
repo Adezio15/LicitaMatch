@@ -33,16 +33,21 @@ export const filterSchema = z.object({
 });
 
 // Batches bound memory; the full persisted catalog is considered for new interests.
-export async function correlateOpportunities(database, empresaId = null) {
+export async function correlateOpportunities(database, empresaId = null, logger) {
   const { rows: interests } = await database.query(`SELECT i.* FROM interesses i
     JOIN empresas e ON e.id=i.empresa_id WHERE i.ativo=true AND e.status='ativo'
     AND ($1::bigint IS NULL OR i.empresa_id=$1)`, [empresaId]);
+  logger?.info({ event: 'matches.start', interests: interests.length }, 'Início da análise de matches');
+  const qualified = new Set();
+  let found = 0;
   let cursor = '0', created = 0;
   while (interests.length) {
     const { rows } = await database.query('SELECT *, licitacao_permitida(modalidade,uf) AS permitida FROM licitacoes_pncp WHERE id>$1 ORDER BY id LIMIT 250', [cursor]);
     if (!rows.length) break;
+    found += rows.length;
     for (const item of rows) for (const interest of interests) {
       const score = item.permitida ? matchLicitacao(item, interest) : 0;
+      if (score >= 67) qualified.add(item.id);
       if (!score) {
         await database.query('UPDATE matches SET score=0 WHERE interesse_id=$1 AND licitacao_id=$2 AND empresa_id=$3 AND score<>0', [interest.id,item.id,interest.empresa_id]);
         continue;
@@ -55,6 +60,7 @@ export async function correlateOpportunities(database, empresaId = null) {
     }
     cursor = rows.at(-1).id;
   }
+  logger?.info({ event: 'matches.complete', found, matches67: qualified.size, updated: created }, 'Análise concluída: licitações distintas com match >= 67%');
   return created;
 }
 

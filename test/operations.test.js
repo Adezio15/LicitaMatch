@@ -75,6 +75,7 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
       assert.match(page.text, new RegExp('href="' + path + '" aria-current="page"'));
     }
     await a.get('/admin/operacao').expect(403);
+    await a.post('/admin/operacao/email-teste').set('X-CSRF-Token',first.csrfToken).send({email:'test@example.test'}).expect(403);
     await a.post('/api/conta/alertas').set('X-CSRF-Token',first.csrfToken).send({alertas_email:true}).expect(200);
     const whatsapp={whatsapp_numero:'(84) 99999-9999',alertas_whatsapp:true,confirmar_whatsapp:true};
     await a.post('/api/conta/whatsapp').send(whatsapp).expect(403);
@@ -102,7 +103,16 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     assert.equal((await a.get('/api/oportunidades').expect(200)).body.total,0);
     assert.equal((await db.query('SELECT status FROM matches WHERE id=$1',[id])).rows[0].status,'aceito');
     await db.query("UPDATE usuarios SET tipo='admin' WHERE id=$1",[first.user.id]);
-    await a.get('/admin/operacao').expect(200);
+    const operationPage = await a.get('/admin/operacao').expect(200);
+    assert.ok(operationPage.text.includes('Enviar e-mail de teste'));
+    await a.post('/admin/operacao/email-teste').send({email:'test@example.test'}).expect(403);
+    await a.post('/admin/operacao/email-teste').set('X-CSRF-Token',first.csrfToken).send({email:'invalid'}).expect(422);
+    let testRecipient;
+    app.locals.operations.sendTestEmail = async to => { testRecipient = to; };
+    await a.post('/admin/operacao/email-teste').set('X-CSRF-Token',first.csrfToken).send({email:'test@example.test'}).expect(303).expect('Location','/admin/operacao?emailTeste=enviado');
+    assert.equal(testRecipient,'test@example.test');
+    app.locals.operations.sendTestEmail = async () => { throw new Error('SMTP failure'); };
+    await a.post('/admin/operacao/email-teste').set('X-CSRF-Token',first.csrfToken).send({email:'test@example.test'}).expect(303).expect('Location','/admin/operacao?emailTeste=falhou');
     await a.post('/admin/operacao/sincronizar').set('X-CSRF-Token',first.csrfToken).send({}).expect(303);
   } finally { await app.locals.sessionStore.close(); await db.close(); }
 });
@@ -123,7 +133,8 @@ test('worker mantém cursor, isola falhas, deduplica fontes, cria matches e não
     comprasnet:{fetchLatest:async()=>{if(broken) throw new Error('offline');return {items:[{...item,id:'outra-origem'}],hasMore:false};}}
   });
   const emailService = createEmailService({transport:{sendMail:async()=>{if(emailBroken) throw new Error('SMTP indisponível');sends++;return {messageId:'test'};}},from:'alerts@example.test'});
-  const worker = createOperationsService({database,config:{...config,EMAIL_ENABLED:'true'},logger,registry,emailService});
+  const diagnosticLogs = [];
+  const worker = createOperationsService({database,config:{...config,EMAIL_ENABLED:'true'},logger:{info: data => diagnosticLogs.push(data), error: data => diagnosticLogs.push(data)},registry,emailService});
   try {
     const pending = worker.runOnce();
     assert.equal(worker.runOnce(),pending);
@@ -153,6 +164,12 @@ test('worker mantém cursor, isola falhas, deduplica fontes, cria matches e não
     await db.exec("UPDATE tarefas SET proxima_execucao=now(); UPDATE alertas SET tentativas=4,proxima_tentativa=now()");
     await worker.runOnce();
     assert.equal((await db.query('SELECT status FROM alertas')).rows[0].status,'falhou');
+    assert.ok(diagnosticLogs.some(x => x.event === 'search.start'));
+    assert.ok(diagnosticLogs.some(x => x.event === 'matches.complete' && x.matches67 === 1));
+    assert.ok(diagnosticLogs.some(x => x.event === 'alert.called'));
+    for (const reason of ['ja_enviado','preferencia_email_desativada']) {
+      assert.ok(diagnosticLogs.some(x => x.event === 'email.eligibility' && x.motivo === reason && x.email_empresa === 'a@example.test'), reason);
+    }
   } finally { await worker.stop();await db.close(); }
 });
 

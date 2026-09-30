@@ -28,8 +28,21 @@ export function accountRoutes(database, config) {
   router.get('/api/auth/me', requireAuth, controller.me);
   router.get('/admin', requireAuth, requireAdmin, controller.adminDashboard);
   router.get('/admin/operacao', requireAuth, requireAdmin, async (req,res) => {
-    res.render('account/operations', { title: 'Operação', data: await req.app.locals.operations.overview(), scheduled: req.query.agendado === '1' });
+    res.render('account/operations', { title: 'Operação', data: await req.app.locals.operations.overview(), scheduled: req.query.agendado === '1', emailTest: req.query.emailTeste });
   });
+  // Temporary SMTP diagnostic; restricted to administrators and protected by CSRF.
+  router.post('/admin/operacao/email-teste', requireAuth, requireAdmin,
+    rateLimit({ windowMs: 60000, limit: 3, standardHeaders: 'draft-8', legacyHeaders: false }),
+    async (req,res) => {
+      const to = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || to.length > 254) return res.status(422).json({ error: 'Informe um e-mail válido.' });
+      try {
+        await req.app.locals.operations.sendTestEmail(to, req.id);
+        res.redirect(303, '/admin/operacao?emailTeste=enviado');
+      } catch {
+        res.redirect(303, '/admin/operacao?emailTeste=falhou');
+      }
+    });
   router.post('/admin/operacao/sincronizar', requireAuth, requireAdmin, async (req,res) => {
     await req.app.locals.operations.schedule();
     res.redirect(303,'/admin/operacao?agendado=1');
