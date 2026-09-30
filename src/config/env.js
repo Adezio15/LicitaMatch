@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { emailProvider, emailFields } from './email.js';
 import { z } from 'zod';
 
 // Called explicitly by entrypoints before validation. Importing this module does
@@ -51,7 +52,8 @@ const schema = z.object({
   PNCP_MODALIDADES: z.string().regex(/^\d+(,\d+)*$/).default('4,6,7,8,9,12'),
   COMPRASNET_MODALIDADES: z.string().regex(/^\d+(,\d+)*$/).default('3,5,6,7'),
   EMAIL_ENABLED: z.enum(['true','false']).default('false'),
-  EMAIL_PROVIDER: z.enum(['smtp','resend']).default('smtp'),
+  BREVO_API_KEY: z.preprocess(value => typeof value === 'string' && !value.trim() ? undefined : value, z.string().trim().min(1).optional()),
+  EMAIL_PROVIDER: z.enum(['smtp','resend','brevo_api']).default('smtp'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
   WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
   WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1).optional(),
@@ -79,7 +81,7 @@ const schema = z.object({
       ctx.addIssue({code:'custom',path:['DATABASE_DIRECT_URL'],message:'WORKER_REQUIRES_DIRECT_CONNECTION'});
     }
   }
-  if (config.EMAIL_ENABLED === 'true') for (const field of config.EMAIL_PROVIDER === 'resend' ? ['EMAIL_FROM','RESEND_API_KEY'] : ['EMAIL_FROM','SMTP_HOST','SMTP_USER','SMTP_PASSWORD']) {
+  if (config.EMAIL_ENABLED === 'true') for (const field of emailFields(config)) {
     if (!config[field]) ctx.addIssue({ code: 'custom', path: [field], message: 'MISSING' });
   }
   if (config.WHATSAPP_ENABLED === 'true') for (const field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) {
@@ -92,9 +94,9 @@ const schema = z.object({
 export function parseEnv(input) {
   const normalizedInput = { ...input };
   normalizedInput.COMPRASNET_ENABLED ??= 'true';
-  normalizedInput.EMAIL_PROVIDER ??= normalizedInput.RESEND_API_KEY ? 'resend' : 'smtp';
+  normalizedInput.EMAIL_PROVIDER = emailProvider(normalizedInput);
   for (const [flag, fields] of Object.entries({
-    EMAIL_ENABLED: normalizedInput.EMAIL_PROVIDER === 'resend' ? ['EMAIL_FROM','RESEND_API_KEY'] : ['EMAIL_FROM', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'],
+    EMAIL_ENABLED: emailFields(normalizedInput),
     WHATSAPP_ENABLED: ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION', 'WHATSAPP_TEMPLATE_NAME']
   })) normalizedInput[flag] ??= fields.every(field => typeof normalizedInput[field] === 'string' && normalizedInput[field].trim()) ? 'true' : 'false';
   const result = schema.safeParse(normalizedInput);

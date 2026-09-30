@@ -2,8 +2,8 @@
 <main class="page"><header class="page-heading"><span class="eyebrow">ADMINISTRAÇÃO</span><h1>Operação e fontes</h1><p>Acompanhe a coleta de licitações, a correlação e os alertas.</p></header>
 <% if (scheduled) { %><p class="panel" role="status">Processamento agendado para o próximo ciclo.</p><% } %>
 <section class="panel section-gap"><h2>Teste temporário de e-mail</h2>
-<% if (emailTest === 'enviado') { %><p role="status">E-mail aceito pelo servidor SMTP. Verifique a caixa de entrada e o spam.</p><% } %>
-<% if (emailTest === 'falhou') { %><p role="alert">O teste falhou. Consulte os eventos email.test e email.failed nos logs do Railway.</p><% } %>
+<% if (emailTest === 'enviado') { %><p role="status">E-mail aceito pelo provedor de e-mail. Verifique a caixa de entrada e o spam.</p><% } %>
+<% if (emailTest === 'falhou') { %><p role="alert">O teste falhou. Consulte os eventos email.api.failed, email.test e email.failed nos logs do Railway.</p><% } %>
 <form method="post" action="/admin/operacao/email-teste">
 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 <label for="test-email">Destinatário do teste</label>

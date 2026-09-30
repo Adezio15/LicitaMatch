@@ -30,7 +30,7 @@ export function accountRoutes(database, config) {
   router.get('/admin/operacao', requireAuth, requireAdmin, async (req,res) => {
     res.render('account/operations', { title: 'Operação', data: await req.app.locals.operations.overview(), scheduled: req.query.agendado === '1', emailTest: req.query.emailTeste });
   });
-  // Temporary SMTP diagnostic; restricted to administrators and protected by CSRF.
+  // Temporary email diagnostic; restricted to administrators and protected by CSRF.
   router.post('/admin/operacao/email-teste', requireAuth, requireAdmin,
     rateLimit({ windowMs: 60000, limit: 3, standardHeaders: 'draft-8', legacyHeaders: false }),
     async (req,res) => {

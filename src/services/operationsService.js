@@ -1,10 +1,11 @@
-import { smtpTransport, diagnosticTransport, sendTestEmail, emailError } from './emailDiagnostics.js';
+import { emailTransport, diagnosticTransport, sendTestEmail, emailError } from './emailDiagnostics.js';
 import { createPncpSource } from './sources/pncpSource.js';
 import { createComprasnetSource } from './sources/comprasnetSource.js';
 import { createSourceRegistry } from './sources/sourceRegistry.js';
 import { persistPncpItems } from './pncpPersistenceService.js';
 import { correlateOpportunities } from './opportunityService.js';
-import { createEmailService, createResendTransport } from './emailService.js';
+import { emailProvider, emailFields } from '../config/email.js';
+import { createEmailService } from './emailService.js';
 import { safeError } from '../utils/safeError.js';
 import { createWhatsAppService } from './whatsappService.js';
 
@@ -15,8 +16,8 @@ export function createOperationsService({ database, config, logger, registry, em
   });
   let transport;
   if (!emailService && config.EMAIL_ENABLED === 'true') {
-    transport = config.EMAIL_PROVIDER === 'resend' ? createResendTransport({ apiKey: config.RESEND_API_KEY }) : smtpTransport(config);
-    emailService = createEmailService({ transport: diagnosticTransport({ transport, config, logger, provider: config.EMAIL_PROVIDER || 'smtp' }), from: config.EMAIL_FROM });
+    transport = emailTransport(config);
+    emailService = createEmailService({ transport: diagnosticTransport({ transport, config, logger, provider: emailProvider(config) }), from: config.EMAIL_FROM });
   }
   const definitions = [];
   if (!whatsappService && config.WHATSAPP_ENABLED === 'true') whatsappService = createWhatsAppService({config});
@@ -179,7 +180,7 @@ export function createOperationsService({ database, config, logger, registry, em
       return pending;
     },
     start() {
-      logger.info({ event: 'worker.start', workerEnabled: config.WORKER_ENABLED, syncEnabled: config.SYNC_ENABLED, emailEnabled: config.EMAIL_ENABLED, emailProvider: config.EMAIL_PROVIDER, alertMinScore: config.ALERT_MIN_SCORE, sources: registry.listSources(true).map(({id,enabled}) => ({id,enabled})) }, 'Configuração do processamento automático');
+      logger.info({ event: 'worker.start', workerEnabled: config.WORKER_ENABLED, syncEnabled: config.SYNC_ENABLED, emailEnabled: config.EMAIL_ENABLED, emailProvider: emailProvider(config), provider: emailProvider(config), alertMinScore: config.ALERT_MIN_SCORE, sources: registry.listSources(true).map(({id,enabled}) => ({id,enabled})) }, 'Configuração do processamento automático');
       if (timer || config.WORKER_ENABLED !== 'true') { logger.info({ event: 'worker.skipped', reason: timer ? 'ja_iniciado' : 'WORKER_ENABLED=false' }, 'Inicialização ignorada'); return; }
       stopped = false;
       const tick = () => service.runOnce().catch(error => logger.error({ error: safeError(error) }, 'Falha no worker'));
@@ -196,7 +197,7 @@ export function createOperationsService({ database, config, logger, registry, em
       const tasks = (await database.query('SELECT * FROM tarefas ORDER BY nome')).rows;
       const alerts = (await database.query('SELECT canal,status,count(*)::int AS total FROM alertas GROUP BY canal,status ORDER BY canal,status')).rows;
       return { tasks,alerts,workerEnabled: config.WORKER_ENABLED === 'true',emailEnabled: config.EMAIL_ENABLED === 'true',whatsappEnabled:config.WHATSAPP_ENABLED==='true',
-        diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', config.EMAIL_PROVIDER === 'resend' ? ['EMAIL_FROM','RESEND_API_KEY'] : ['EMAIL_FROM','SMTP_HOST','SMTP_USER','SMTP_PASSWORD']), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) },
+        diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', emailFields(config)), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) },
         sources: registry.listSources(true).map(({ id,name,enabled }) => ({ id,name,enabled })) };
     },
     async schedule() {
