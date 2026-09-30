@@ -110,3 +110,11 @@ test('SESSION_SECRET rejeita placeholder, segredo curto e valores triviais', () 
   }
   assert.equal(parseEnv({ ...production, DATABASE_URL: neonUrl }).SESSION_SECRET, production.SESSION_SECRET);
 });
+
+test('SMTP_SECURE accepts explicit strings and rejects invalid values', () => {
+  const input = { NODE_ENV: 'test', DATABASE_URL: 'postgresql://test:test@localhost/test', SESSION_SECRET: 'automated-tests-only-'.repeat(4) };
+  assert.equal(parseEnv(input).SMTP_SECURE, undefined);
+  assert.equal(parseEnv({ ...input, SMTP_SECURE: 'false' }).SMTP_SECURE, 'false');
+  assert.equal(parseEnv({ ...input, SMTP_PORT: '465', SMTP_SECURE: 'true' }).SMTP_SECURE, 'true');
+  assert.throws(() => parseEnv({ ...input, SMTP_SECURE: 'yes' }), /SMTP_SECURE/);
+});

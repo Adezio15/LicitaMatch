@@ -2,11 +2,14 @@ import nodemailer from 'nodemailer';
 import { randomUUID } from 'node:crypto';
 import { safeError } from '../utils/safeError.js';
 
+const smtpSecure = config => config.SMTP_SECURE === undefined
+  ? Number(config.SMTP_PORT) === 465 : config.SMTP_SECURE === 'true';
+
 export function smtpTransport(config) {
   return nodemailer.createTransport({ host: config.SMTP_HOST, port: config.SMTP_PORT,
-    secure: config.SMTP_PORT === 465, requireTLS: true,
+    secure: smtpSecure(config), requireTLS: true,
     auth: { user: config.SMTP_USER, pass: config.SMTP_PASSWORD },
-    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000,
+    connectionTimeout: 30000, greetingTimeout: 30000, socketTimeout: 30000,
     disableFileAccess: true, disableUrlAccess: true });
 }
 
@@ -26,7 +29,7 @@ export function emailError(error, config) {
 export function diagnosticTransport({ transport, config, logger, provider = 'smtp' }) {
   return { async sendMail(payload) {
     const context = { deliveryId: randomUUID(), provider, recipient: payload.to,
-      ...(provider === 'smtp' ? { SMTP_HOST: config.SMTP_HOST, SMTP_PORT: config.SMTP_PORT, SMTP_USER: config.SMTP_USER } : {}) };
+      ...(provider === 'smtp' ? { SMTP_HOST: config.SMTP_HOST, SMTP_PORT: config.SMTP_PORT, SMTP_SECURE: smtpSecure(config), SMTP_USER: config.SMTP_USER } : {}) };
     let stage = 'start';
     logger.info({ ...context, event: 'email.start' }, 'Início da função de envio');
     try {
@@ -34,7 +37,8 @@ export function diagnosticTransport({ transport, config, logger, provider = 'smt
         stage = 'verify';
         logger.info({ ...context, event: 'email.verify.start' }, 'Início de transporter.verify()');
         const verified = await transport.verify();
-        logger.info({ ...context, event: 'email.verify.result', verified }, 'Resultado de transporter.verify()');
+        logger.info({ ...context, event: 'email.verify.result', verified, connectionEstablished: verified === true },
+          verified === true ? 'Conexão SMTP estabelecida; TLS e autenticação verificados' : 'Verificação SMTP não confirmada');
       }
       stage = 'sendMail';
       logger.info({ ...context, event: 'email.sendMail.start' }, 'Início de sendMail()');
@@ -45,7 +49,8 @@ export function diagnosticTransport({ transport, config, logger, provider = 'smt
       logger.info({ ...context, event: 'email.sent', messageId: result?.messageId }, 'E-mail aceito pelo provedor');
       return result;
     } catch (error) {
-      logger.error({ ...context, event: 'email.failed', stage, error: emailError(error, config) }, 'Falha no envio de e-mail');
+      logger.error({ ...context, event: 'email.failed', stage,
+        ...(provider === 'smtp' && error?.code === 'ETIMEDOUT' && error?.command === 'CONN' ? { connectionEstablished: false } : {}), error: emailError(error, config) }, 'Falha no envio de e-mail');
       throw error;
     }
   } };
@@ -53,7 +58,7 @@ export function diagnosticTransport({ transport, config, logger, provider = 'smt
 
 export async function sendTestEmail({ config, logger, to, requestId, transportFactory = smtpTransport }) {
   logger.info({ event: 'email.test.start', requestId, recipient: to,
-    SMTP_HOST: config.SMTP_HOST, SMTP_PORT: config.SMTP_PORT, SMTP_USER: config.SMTP_USER }, 'Teste SMTP solicitado');
+    SMTP_HOST: config.SMTP_HOST, SMTP_PORT: config.SMTP_PORT, SMTP_SECURE: smtpSecure(config), SMTP_USER: config.SMTP_USER }, 'Teste SMTP solicitado');
   let transport;
   try {
     if (typeof to !== 'string' || to.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error('Destinatário inválido.');

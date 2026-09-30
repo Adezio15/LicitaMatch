@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTestEmail, diagnosticTransport, emailError } from '../src/services/emailDiagnostics.js';
+import { sendTestEmail, diagnosticTransport, emailError, smtpTransport } from '../src/services/emailDiagnostics.js';
 const config = { SMTP_HOST: 'smtp.example.test', SMTP_PORT: 587, SMTP_USER: 'user@example.test', SMTP_PASSWORD: 'private-test-password', EMAIL_FROM: 'alerts@example.test' };
 function capture() { const logs = []; return { logs, logger: { info: value => logs.push(value), error: value => logs.push(value) } }; }
 test('test SMTP uses existing configuration, verifies before sending, logs messageId and closes', async () => {
@@ -14,6 +14,7 @@ test('test SMTP uses existing configuration, verifies before sending, logs messa
   } });
   assert.deepEqual(calls, ['verify', 'send', 'close']); assert.equal(result.messageId, 'smtp-123');
   assert.equal(logs.find(x => x.event === 'email.verify.result').verified, true);
+  assert.equal(logs.find(x => x.event === 'email.verify.result').connectionEstablished, true);
   assert.equal(logs.find(x => x.event === 'email.sent').messageId, 'smtp-123');
   assert.ok(!JSON.stringify(logs).includes(config.SMTP_PASSWORD));
 });
@@ -34,4 +35,28 @@ test('sendMail failures and missing configuration are diagnosed without successf
   assert.ok(closed); assert.equal(logs.find(x => x.event === 'email.failed').stage, 'sendMail');
   assert.ok(!logs.some(x => x.event === 'email.sent'));
   await assert.rejects(sendTestEmail({ config: {}, logger, to: 'test@example.test', transportFactory: () => assert.fail('missing configuration') }));
+});
+
+test('Brevo transport supports STARTTLS 587 and explicit or inferred TLS 465', () => {
+  for (const [port, flag, expected] of [[587, 'false', false], [465, 'true', true], [587, undefined, false], [465, undefined, true], [2525, 'true', true], [465, 'false', false]]) {
+    const transport = smtpTransport({ ...config, SMTP_HOST: 'smtp-relay.brevo.com', SMTP_PORT: port, SMTP_SECURE: flag });
+    try {
+      assert.equal(transport.options.host, 'smtp-relay.brevo.com');
+      assert.equal(transport.options.port, port);
+      assert.equal(transport.options.secure, expected);
+      assert.equal(transport.options.requireTLS, true);
+      for (const key of ['connectionTimeout', 'greetingTimeout', 'socketTimeout']) assert.equal(transport.options[key], 30000);
+      assert.deepEqual(transport.options.auth, { user: config.SMTP_USER, pass: config.SMTP_PASSWORD });
+    } finally { transport.close(); }
+  }
+});
+test('CONN timeout explicitly records connection not established and blocks sendMail', async () => {
+  const { logs, logger } = capture();
+  const transport = { verify: async () => { throw Object.assign(new Error('Connection timeout'), { code: 'ETIMEDOUT', command: 'CONN' }); }, sendMail: async () => assert.fail('must not send') };
+  await assert.rejects(diagnosticTransport({ transport, config, logger }).sendMail({ to: 'test@example.test' }));
+  const failure = logs.find(x => x.event === 'email.failed');
+  assert.equal(failure.connectionEstablished, false);
+  assert.equal(failure.error.code, 'ETIMEDOUT');
+  assert.equal(failure.error.command, 'CONN');
+  assert.ok(!logs.some(x => x.event === 'email.sent'));
 });

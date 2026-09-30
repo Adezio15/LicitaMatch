@@ -62,6 +62,7 @@ const schema = z.object({
   EMAIL_FROM: z.string().email().optional(),
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_SECURE: z.enum(['true', 'false']).optional(),
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
   ALERT_MIN_SCORE: z.coerce.number().int().min(1).max(100).default(70),
