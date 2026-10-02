@@ -42,7 +42,7 @@ function formatText(item = {}, score, interestName, customer) {
 
 export function createEmailService({ transport, from = 'alertas@licitamatch.local' } = {}) {
   return {
-    async sendMatchAlert({ to, customer, item, score, interestName }) {
+    async sendMatchAlert({ to, customer, item, score, interestName, context }) {
       if (!transport || typeof transport.sendMail !== 'function') {
         throw new Error('Transport de e-mail não configurado.');
       }
@@ -76,7 +76,7 @@ export function createEmailService({ transport, from = 'alertas@licitamatch.loca
         html
       };
 
-      const result = await transport.sendMail(payload);
+      const result = await transport.sendMail(payload, context);
       if (result?.accepted === false || (Array.isArray(result?.accepted) && !result.accepted.length) || result?.rejected?.length) {
         throw new Error('O servidor SMTP não aceitou o destinatário.');
       }

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import nodemailer from 'nodemailer';
 import { parseEnv } from '../src/config/env.js';
-import { sendTestEmail, emailTransport, diagnosticTransport } from '../src/services/emailDiagnostics.js';
+import { sendEmail, sendTestEmail } from '../src/services/emailDiagnostics.js';
 import { createEmailService } from '../src/services/emailService.js';
-import { emailProvider } from '../src/config/email.js';
+import { createOperationsService } from '../src/services/operationsService.js';
 const input = { NODE_ENV: 'test', DATABASE_URL: 'postgresql://test:test@localhost/test', SESSION_SECRET: 'automated-tests-only-'.repeat(4), EMAIL_FROM: 'alerts@example.test', BREVO_API_KEY: 'synthetic-private-brevo-key', EMAIL_PROVIDER: 'smtp' };
 const config = parseEnv(input);
 function capture() { const logs = []; return { logs, logger: { info: data => logs.push(data), error: data => logs.push(data) } }; }
@@ -35,9 +35,7 @@ test('test button and match alerts use Brevo HTTP without Nodemailer or verify',
   };
   try {
     await sendTestEmail({ config, logger, to: 'recipient@example.test', fetchImpl });
-    const transport = emailTransport(config, { fetchImpl });
-    transport.verify = () => assert.fail('verify must not be called');
-    await createEmailService({ from: config.EMAIL_FROM, transport: diagnosticTransport({ transport, config, logger, provider: emailProvider(config) }) })
+    await createEmailService({ from: config.EMAIL_FROM, transport: { sendMail: payload => sendEmail({ config, logger, payload, fetchImpl }) } })
       .sendMatchAlert({ to: 'recipient@example.test', score: 80 });
     assert.equal(payloads.length, 2);
     assert.equal(logs.filter(x => x.event === 'email.api.success' && x.provider === 'brevo_api' && x.messageId === 'brevo-123').length, 2);
@@ -60,4 +58,43 @@ test('Brevo HTTP errors, malformed responses and network timeouts are logged wit
     assert.ok(!logs.some(x => x.event === 'email.api.success'));
     assert.ok(!JSON.stringify(logs).includes(config.BREVO_API_KEY));
   }
+});
+
+test('automatic worker sends at 67 via the same Brevo function and logs context and API outcomes', async () => {
+  const { logs, logger } = capture();
+  const originalFetch = globalThis.fetch;
+  const payloads = [];
+  let fail = false;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.brevo.com/v3/smtp/email');
+    payloads.push(JSON.parse(options.body));
+    return new Response(JSON.stringify(fail ? { message: 'Rejected' } : { messageId: 'automatic-67' }), { status: fail ? 400 : 201 });
+  };
+  const row = { id: 1, email: 'recipient@example.test', razao_social: 'Empresa', titulo: 'Interesse', score: 67, objeto: 'Compra' };
+  const query = async (sql, params) => {
+    if (sql.includes('pg_try_advisory_lock')) return { rows: [{ locked: true }] };
+    if (sql.includes('SELECT * FROM tarefas')) return { rows: [{}] };
+    if (sql.includes('SELECT a.id') || sql.includes('INSERT INTO alertas')) {
+      assert.equal(params[0], 67, 'email threshold must override configured 80');
+      return { rows: sql.includes('SELECT a.id') ? [row] : [] };
+    }
+    if (sql.includes('FILTER (WHERE m.score>=67)')) assert.equal(params[0], 67);
+    return { rows: [] };
+  };
+  const worker = createOperationsService({ config: { ...config, ALERT_MIN_SCORE: 80 }, logger,
+    database: { connect: async () => ({ query, release() {} }) }, registry: { listSources: () => [] } });
+  try {
+    await worker.sendTestEmail(row.email);
+    await worker.runOnce();
+    assert.equal(payloads.length, 2);
+    assert.match(payloads[1].subject, /67%/);
+    const expected = { empresa: row.razao_social, interesse: row.titulo, score: 67, destinatario: row.email };
+    for (const event of ['automatic.alert.start', 'email.api.success']) {
+      assert.ok(logs.some(log => log.event === event && Object.entries(expected).every(([key, value]) => log[key] === value)));
+    }
+    fail = true;
+    await worker.runOnce();
+    assert.ok(logs.some(log => log.event === 'email.api.failed' && log.empresa === row.razao_social));
+    assert.ok(!logs.some(log => log.event?.startsWith('email.verify')));
+  } finally { await worker.stop(); globalThis.fetch = originalFetch; }
 });

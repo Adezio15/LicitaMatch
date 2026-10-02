@@ -1,4 +1,4 @@
-import { emailTransport, diagnosticTransport, sendTestEmail, emailError } from './emailDiagnostics.js';
+import { sendEmail, sendTestEmail, emailError } from './emailDiagnostics.js';
 import { createPncpSource } from './sources/pncpSource.js';
 import { createComprasnetSource } from './sources/comprasnetSource.js';
 import { createSourceRegistry } from './sources/sourceRegistry.js';
@@ -14,10 +14,12 @@ export function createOperationsService({ database, config, logger, registry, em
     pncp: { ...createPncpSource(), name: 'PNCP', enabled: config.SYNC_ENABLED === 'true' },
     comprasnet: { ...createComprasnetSource(), name: 'Compras.gov.br', enabled: config.SYNC_ENABLED === 'true' && config.COMPRASNET_ENABLED === 'true' }
   });
-  let transport;
+  const emailMinScore = 67;
   if (!emailService && config.EMAIL_ENABLED === 'true') {
-    transport = emailTransport(config);
-    emailService = createEmailService({ transport: diagnosticTransport({ transport, config, logger, provider: emailProvider(config) }), from: config.EMAIL_FROM });
+    emailService = createEmailService({
+      transport: { sendMail: (payload, context) => sendEmail({ config, logger, payload, context }) },
+      from: config.EMAIL_FROM
+    });
   }
   const definitions = [];
   if (!whatsappService && config.WHATSAPP_ENABLED === 'true') whatsappService = createWhatsAppService({config});
@@ -72,13 +74,14 @@ export function createOperationsService({ database, config, logger, registry, em
       LEFT JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=e.id
       LEFT JOIN licitacoes_pncp l ON l.id=m.licitacao_id
       LEFT JOIN alertas a ON a.match_id=m.id AND a.usuario_id=u.id AND a.canal='email'
-      GROUP BY e.id,e.razao_social,e.email,u.email,motivo`, [config.ALERT_MIN_SCORE,config.EMAIL_ENABLED]);
+      GROUP BY e.id,e.razao_social,e.email,u.email,motivo`, [emailMinScore,config.EMAIL_ENABLED]);
     for (const row of rows) logger.info({ event: 'email.eligibility', ...row,
       envio: row.motivo === 'elegivel_aguardando_lote' ? 'aguardando_lote' : 'ignorado',
-      alertMinScore: config.ALERT_MIN_SCORE }, 'Empresa analisada para envio de e-mail');
+      alertMinScore: emailMinScore }, 'Empresa analisada para envio de e-mail');
   }
 
   async function alerts(client,channel) {
+    const minScore = channel === 'email' ? emailMinScore : config.ALERT_MIN_SCORE;
     if (channel === 'email') await diagnoseEmail(client);
     const preference = `(($2='email' AND u.alertas_email=true) OR
       ($2='whatsapp' AND u.alertas_whatsapp=true AND u.whatsapp_numero<>''
@@ -89,7 +92,7 @@ export function createOperationsService({ database, config, logger, registry, em
       JOIN empresas e ON e.id=m.empresa_id JOIN usuarios u ON u.empresa_id=m.empresa_id
       WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
       AND e.status='ativo' AND u.ativo=true AND ${preference} AND licitacao_permitida(l.modalidade,l.uf)
-      ON CONFLICT (match_id,usuario_id,canal) DO NOTHING`, [config.ALERT_MIN_SCORE,channel]);
+      ON CONFLICT (match_id,usuario_id,canal) DO NOTHING`, [minScore,channel]);
     const { rows } = await client.query(`SELECT a.id,u.email,u.whatsapp_numero,e.razao_social,i.titulo,m.score,l.objeto,l.modalidade,l.unidade_gestora
       FROM alertas a JOIN matches m ON m.id=a.match_id
       JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
@@ -97,16 +100,19 @@ export function createOperationsService({ database, config, logger, registry, em
       JOIN empresas e ON e.id=u.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
       WHERE a.status='pendente' AND a.canal=$2 AND a.proxima_tentativa<=now() AND a.tentativas<5
       AND u.ativo=true AND ${preference} AND e.status='ativo' AND i.ativo=true
-      AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf) ORDER BY a.id LIMIT 25`, [config.ALERT_MIN_SCORE,channel]);
+      AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf) ORDER BY a.id LIMIT 25`, [minScore,channel]);
     logger.info({ event: 'alerts.batch', channel, selected: rows.length, limit: 25 }, 'Fila selecionada para envio');
     let sent = 0, failed = 0;
     for (const row of rows) {
       if (stopped) { logger.info({ event: 'alert.skipped', channel, reason: 'worker_encerrando' }, 'Envio ignorado'); break; }
       logger.info({ event: 'alert.called', channel, alertId: row.id, empresa: row.razao_social, recipient: channel === 'email' ? row.email : row.whatsapp_numero }, 'Envio chamado');
+      const context = { alertId: row.id, empresa: row.razao_social, interesse: row.titulo, score: row.score,
+        destinatario: row.email };
+      if (channel === 'email') logger.info({ ...context, event: 'automatic.alert.start', recipient: row.email }, 'Início do alerta automático');
       try {
         const delivery = channel==='email' ? emailService : whatsappService;
         const result = await delivery.sendMatchAlert({ to: channel==='email' ? row.email : row.whatsapp_numero,customer: row.razao_social,interestName: row.titulo,
-          score: row.score,item: { objeto: row.objeto,modalidade: row.modalidade,unidadeGestora: row.unidade_gestora } });
+          score: row.score,context,item: { objeto: row.objeto,modalidade: row.modalidade,unidadeGestora: row.unidade_gestora } });
         await client.query("UPDATE alertas SET status='enviado',enviado_em=now(),tentativas=tentativas+1,provedor_mensagem_id=$2 WHERE id=$1", [row.id,result?.messageId || null]);
         sent++;
       } catch (error) {
@@ -180,7 +186,7 @@ export function createOperationsService({ database, config, logger, registry, em
       return pending;
     },
     start() {
-      logger.info({ event: 'worker.start', workerEnabled: config.WORKER_ENABLED, syncEnabled: config.SYNC_ENABLED, emailEnabled: config.EMAIL_ENABLED, emailProvider: emailProvider(config), provider: emailProvider(config), alertMinScore: config.ALERT_MIN_SCORE, sources: registry.listSources(true).map(({id,enabled}) => ({id,enabled})) }, 'Configuração do processamento automático');
+      logger.info({ event: 'worker.start', workerEnabled: config.WORKER_ENABLED, syncEnabled: config.SYNC_ENABLED, emailEnabled: config.EMAIL_ENABLED, emailProvider: emailProvider(config), provider: emailProvider(config), alertMinScore: emailMinScore, sources: registry.listSources(true).map(({id,enabled}) => ({id,enabled})) }, 'Configuração do processamento automático');
       if (timer || config.WORKER_ENABLED !== 'true') { logger.info({ event: 'worker.skipped', reason: timer ? 'ja_iniciado' : 'WORKER_ENABLED=false' }, 'Inicialização ignorada'); return; }
       stopped = false;
       const tick = () => service.runOnce().catch(error => logger.error({ error: safeError(error) }, 'Falha no worker'));
@@ -191,7 +197,6 @@ export function createOperationsService({ database, config, logger, registry, em
       stopped = true;
       clearInterval(timer); timer = null;
       await pending;
-      transport?.close?.();
     },
     async overview() {
       const tasks = (await database.query('SELECT * FROM tarefas ORDER BY nome')).rows;

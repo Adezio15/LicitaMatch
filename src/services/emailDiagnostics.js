@@ -36,9 +36,9 @@ export function emailError(error, config) {
   return result;
 }
 
-export function diagnosticTransport({ transport, config, logger, provider = 'smtp' }) {
+export function diagnosticTransport({ transport, config, logger, provider = 'smtp', context: alertContext = {} }) {
   return { async sendMail(payload) {
-    const context = { deliveryId: randomUUID(), provider, recipient: payload.to,
+    const context = { ...alertContext, deliveryId: randomUUID(), provider, recipient: payload.to,
       ...(provider === 'smtp' ? { SMTP_HOST: config.SMTP_HOST, SMTP_PORT: config.SMTP_PORT, SMTP_SECURE: smtpSecure(config), SMTP_USER: config.SMTP_USER } : {}) };
     let stage = 'start';
     logger.info({ ...context, event: 'email.start' }, 'Início da função de envio');
@@ -66,22 +66,35 @@ export function diagnosticTransport({ transport, config, logger, provider = 'smt
   } };
 }
 
-export async function sendTestEmail({ config, logger, to, requestId, transportFactory = smtpTransport, fetchImpl = globalThis.fetch }) {
+// Both manual tests and automatic alerts use this delivery function.
+export async function sendEmail({ config, logger, payload, context = {}, transportFactory = smtpTransport, fetchImpl = globalThis.fetch }) {
   const provider = emailProvider(config);
-  logger.info({ event: 'email.test.start', provider, requestId, recipient: to }, 'Teste de e-mail solicitado');
   let transport;
   try {
+    const to = payload.to;
     if (typeof to !== 'string' || to.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error('Destinatario invalido.');
     const missing = emailFields(config).filter(key => !config[key]);
     if (missing.length) throw new Error(`Configuracao ausente: ${missing.join(', ')}.`);
     transport = emailTransport(config, { transportFactory, fetchImpl });
-    return await diagnosticTransport({ transport, config, logger, provider }).sendMail({
+    return await diagnosticTransport({ transport, config, logger, provider, context }).sendMail(payload);
+  } catch (error) {
+    if (!transport) logger.error({ ...context, event: provider === 'brevo_api' ? 'email.api.failed' : 'email.failed',
+      provider, recipient: payload.to, error: emailError(error, config) }, 'Falha ao preparar envio de e-mail');
+    throw error;
+  } finally { transport?.close?.(); }
+}
+
+export async function sendTestEmail({ config, logger, to, requestId, transportFactory = smtpTransport, fetchImpl = globalThis.fetch }) {
+  const provider = emailProvider(config);
+  logger.info({ event: 'email.test.start', provider, requestId, recipient: to }, 'Teste de e-mail solicitado');
+  try {
+    return await sendEmail({ config, logger, transportFactory, fetchImpl, context: { requestId }, payload: {
       from: config.EMAIL_FROM, to, subject: 'LicitaMatch - e-mail de teste',
       text: 'Teste de envio do LicitaMatch solicitado na pagina de Operacao.',
       html: '<p>Teste de envio do LicitaMatch solicitado na pagina de Operacao.</p>'
-    });
+    } });
   } catch (error) {
-    logger.error({ event: provider === 'brevo_api' && !transport ? 'email.api.failed' : 'email.test.failed', provider, requestId, error: emailError(error, config) }, 'Teste de e-mail falhou');
+    logger.error({ event: 'email.test.failed', provider, requestId, error: emailError(error, config) }, 'Teste de e-mail falhou');
     throw error;
-  } finally { transport?.close?.(); }
+  }
 }
