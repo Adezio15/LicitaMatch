@@ -33,7 +33,7 @@ export const filterSchema = z.object({
 });
 
 // Batches bound memory; the full persisted catalog is considered for new interests.
-export async function correlateOpportunities(database, empresaId = null, logger) {
+export async function correlateOpportunities(database, empresaId = null, logger, onMatchSaved) {
   const { rows: interests } = await database.query(`SELECT i.* FROM interesses i
     JOIN empresas e ON e.id=i.empresa_id WHERE i.ativo=true AND e.status='ativo'
     AND ($1::bigint IS NULL OR i.empresa_id=$1)`, [empresaId]);
@@ -57,6 +57,12 @@ export async function correlateOpportunities(database, empresaId = null, logger)
         ON CONFLICT (interesse_id,licitacao_id) DO UPDATE SET score=EXCLUDED.score
         WHERE matches.score IS DISTINCT FROM EXCLUDED.score RETURNING id`, [interest.id, item.id, score, interest.empresa_id]);
       created += result.rows.length;
+      for (const match of result.rows) {
+        const context = { matchId: match.id, empresaId: interest.empresa_id, licitacaoId: item.id,
+          interesseId: interest.id, score };
+        logger?.info({ event: 'match.created', ...context }, 'Match salvo');
+        if (onMatchSaved) await onMatchSaved(database, context);
+      }
     }
     cursor = rows.at(-1).id;
   }

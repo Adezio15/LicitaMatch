@@ -51,7 +51,7 @@ export function createOperationsService({ database, config, logger, registry, em
     return { inserted,pages,continuation: Boolean(cursor.page) };
   }
 
-  async function diagnoseEmail(client) {
+  async function diagnoseEmail(client, target = null) {
     const { rows } = await client.query(`SELECT e.id AS empresa_id,e.razao_social,e.email AS email_empresa,
       m.licitacao_id,m.score,
       CASE WHEN $1<>'true' THEN 'EMAIL_ENABLED=false'
@@ -68,31 +68,35 @@ export function createOperationsService({ database, config, logger, registry, em
       FROM empresas e JOIN matches m ON m.empresa_id=e.id
       JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=e.id
       JOIN licitacoes_pncp l ON l.id=m.licitacao_id
-      LEFT JOIN alertas_empresa_email a ON a.empresa_id=e.id AND a.licitacao_id=m.licitacao_id`, [config.EMAIL_ENABLED]);
+      LEFT JOIN alertas_empresa_email a ON a.empresa_id=e.id AND a.licitacao_id=m.licitacao_id
+      WHERE ($2::bigint IS NULL OR m.empresa_id=$2) AND ($3::bigint IS NULL OR m.licitacao_id=$3)`,
+      [config.EMAIL_ENABLED, target?.empresaId ?? null, target?.licitacaoId ?? null]);
     for (const row of rows) {
       logger.info({ event: 'email.eligibility', ...row, alertMinScore: emailMinScore }, 'Empresa analisada para envio de e-mail');
       if (row.motivo !== 'elegivel_aguardando_lote') logger.info({ event: 'automatic.alert.skipped', ...row, reason: row.motivo }, 'Alerta automático ignorado');
     }
   }
 
-  async function companyEmailAlerts(client) {
-    await diagnoseEmail(client);
+  async function companyEmailAlerts(client, target = null) {
+    await diagnoseEmail(client, target);
     await client.query(`INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id)
       SELECT DISTINCT ON (m.empresa_id,m.licitacao_id) m.empresa_id,m.licitacao_id,m.id
       FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
       JOIN empresas e ON e.id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
       WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
+        AND ($2::bigint IS NULL OR m.empresa_id=$2) AND ($3::bigint IS NULL OR m.licitacao_id=$3)
         AND e.status='ativo' AND trim(e.email)<>'' AND licitacao_permitida(l.modalidade,l.uf)
       ORDER BY m.empresa_id,m.licitacao_id,m.score DESC,m.id
-      ON CONFLICT (empresa_id,licitacao_id) DO NOTHING`, [emailMinScore]);
+      ON CONFLICT (empresa_id,licitacao_id) DO NOTHING`, [emailMinScore, target?.empresaId ?? null, target?.licitacaoId ?? null]);
     const { rows } = await client.query(`SELECT DISTINCT ON (a.id) a.id,a.empresa_id,a.licitacao_id,e.email,e.razao_social,i.titulo,m.score,
       l.objeto,l.modalidade,l.unidade_gestora FROM alertas_empresa_email a
       JOIN matches m ON m.empresa_id=a.empresa_id AND m.licitacao_id=a.licitacao_id
       JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
       JOIN empresas e ON e.id=a.empresa_id JOIN licitacoes_pncp l ON l.id=a.licitacao_id
       WHERE a.status='pendente' AND e.status='ativo' AND trim(e.email)<>'' AND i.ativo=true
+        AND ($2::bigint IS NULL OR a.empresa_id=$2) AND ($3::bigint IS NULL OR a.licitacao_id=$3)
         AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf)
-      ORDER BY a.id,m.score DESC,m.id LIMIT 25`, [emailMinScore]);
+      ORDER BY a.id,m.score DESC,m.id LIMIT 25`, [emailMinScore, target?.empresaId ?? null, target?.licitacaoId ?? null]);
     let sent = 0, failed = 0;
     const seen = new Set();
     for (const row of rows) {
@@ -130,6 +134,19 @@ export function createOperationsService({ database, config, logger, registry, em
     }
     return { sent, failed };
   }
+
+  async function alertSavedMatch(client, match) {
+    const reason = match.score < emailMinScore ? 'score_abaixo_do_limite'
+      : config.EMAIL_ENABLED !== 'true' ? 'EMAIL_ENABLED=false' : null;
+    if (reason) {
+      logger.info({ ...match, event: 'automatic.alert.skipped', reason }, 'Alerta automático ignorado');
+      return;
+    }
+    // The company/opportunity unique key and atomic pending claim also protect concurrent callers.
+    await companyEmailAlerts(client, match);
+  }
+
+  const correlate = (client, empresaId = null) => correlateOpportunities(client, empresaId, logger, alertSavedMatch);
 
   async function alerts(client,channel) {
     if (channel === 'email') return companyEmailAlerts(client);
@@ -197,10 +214,10 @@ export function createOperationsService({ database, config, logger, registry, em
           proxima_execucao=now()+($2 * interval '1 minute') WHERE nome=$1`, [definition.name,minutes]);
         try {
           if (definition.name.startsWith('alertas') && results.some(result => result.inserted > 0) && !results.some(result => result.name === 'imported-matches')) {
-            results.push({ name: 'imported-matches', matches: await correlateOpportunities(client, null, logger) });
+            results.push({ name: 'imported-matches', matches: await correlate(client) });
           }
           const result = definition.source ? await synchronize(client,definition,state)
-            : definition.name === 'matches' ? { matches: await correlateOpportunities(client, null, logger) } : await alerts(client,definition.name==='alertas_whatsapp' ? 'whatsapp' : 'email');
+            : definition.name === 'matches' ? { matches: await correlate(client) } : await alerts(client,definition.name==='alertas_whatsapp' ? 'whatsapp' : 'email');
           await client.query(`UPDATE tarefas SET estado=$3,ultimo_sucesso=now(),resumo=$2,
             proxima_execucao=CASE WHEN $4 THEN now()+interval '1 minute' ELSE proxima_execucao END WHERE nome=$1`,
           [definition.name,JSON.stringify(result),result.failed ? 'parcial' : 'concluido',result.continuation === true]);
@@ -212,7 +229,7 @@ export function createOperationsService({ database, config, logger, registry, em
         }
       }
       // New imports become visible in this same cycle.
-      if (results.some(result => result.inserted > 0) && !results.some(result => result.name === 'imported-matches')) await correlateOpportunities(client, null, logger);
+      if (results.some(result => result.inserted > 0) && !results.some(result => result.name === 'imported-matches')) await correlate(client);
       if (config.EMAIL_ENABLED !== 'true') await diagnoseEmail(client);
       return { results };
     } finally {
@@ -231,6 +248,7 @@ export function createOperationsService({ database, config, logger, registry, em
     return 'Pronto para envio. Verifique a fila e as preferências dos destinatários.';
   }
   const service = {
+    correlate(empresaId = null) { return correlate(database, empresaId); },
     sendTestEmail(to, requestId) { return sendTestEmail({ config, logger, to, requestId }); },
     runOnce() {
       if (pending) return pending;

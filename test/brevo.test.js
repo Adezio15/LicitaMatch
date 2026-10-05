@@ -98,3 +98,61 @@ test('automatic worker sends at 67 via the same Brevo function and logs context 
     assert.ok(!logs.some(log => log.event?.startsWith('email.verify')));
   } finally { await worker.stop(); globalThis.fetch = originalFetch; }
 });
+
+
+test('persisted matches trigger Brevo immediately, cross 67, log skips and deduplicate per company', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { readMigrations } = await import('../src/services/migrationService.js');
+  const { persistPncpItems } = await import('../src/services/pncpPersistenceService.js');
+  const db = new PGlite();
+  const { logs, logger } = capture();
+  const originalFetch = globalThis.fetch;
+  const payloads = [];
+  let fail = false;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.brevo.com/v3/smtp/email');
+    payloads.push(JSON.parse(options.body));
+    return new Response(JSON.stringify(fail ? {} : { messageId: 'saved-match' }), { status: fail ? 400 : 201 });
+  };
+  const database = { query: (sql, values) => db.query(sql, values) };
+  const worker = createOperationsService({ database, config, logger, registry: { listSources: () => [] } });
+  const item = { id: 'saved-match', dataAbertura: '2026-10-10T12:00:00Z', objeto: 'Compra de notebooks', modalidade: 'Pregão Eletrônico', unidadeGestora: 'Secretaria' };
+  try {
+    for (const migration of await readMigrations()) await db.exec(migration.sql);
+    await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES
+      ('Primeira','11222333000181','first@example.test'),('Segunda','11444777000161','second@example.test');
+      INSERT INTO interesses (empresa_id,titulo,palavras) VALUES
+      (1,'Computadores',ARRAY['notebook','extra']), (2,'Computadores',ARRAY['notebook','compra','extra']);`);
+    await persistPncpItems(database, [item]);
+    await worker.correlate(1);
+    assert.equal(payloads.length, 0);
+    assert.ok(logs.some(x => x.event === 'match.created' && x.score === 50));
+    assert.ok(logs.some(x => x.event === 'automatic.alert.skipped' && x.reason === 'score_abaixo_do_limite'));
+    await db.exec("UPDATE interesses SET palavras=ARRAY['notebook','compra','extra'] WHERE empresa_id=1");
+    await worker.correlate(1);
+    assert.equal(payloads.length, 1, 'score update crossing 67 sends before correlation returns');
+    assert.equal(payloads[0].to[0].email, 'first@example.test');
+    const created = logs.findIndex(x => x.event === 'match.created' && x.score === 67);
+    const started = logs.findIndex(x => x.event === 'automatic.alert.start');
+    assert.ok(created >= 0 && started > created);
+    for (const event of ['automatic.alert.success', 'email.api.success']) assert.ok(logs.some(x => x.event === event));
+    await db.exec("INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Duplicado',ARRAY['notebook'])");
+    await Promise.all([worker.correlate(1), worker.correlate(1)]);
+    assert.equal(payloads.length, 1);
+    assert.ok(logs.some(x => x.event === 'automatic.alert.skipped' && x.reason === 'ja_enviado'));
+    await worker.correlate(2);
+    assert.equal(payloads.length, 2, 'the same opportunity is sent once to each company');
+    assert.equal(payloads[1].to[0].email, 'second@example.test');
+    fail = true;
+    await persistPncpItems(database, [{ ...item, id: 'failed-match', objeto: 'Compra de notebooks novos', unidadeGestora: 'Outra secretaria' }]);
+    await worker.correlate(2);
+    await worker.correlate(2);
+    assert.equal(payloads.length, 3, 'failed or uncertain delivery is not sent again');
+    assert.ok(logs.some(x => x.event === 'email.api.failed'));
+    assert.equal((await db.query("SELECT status FROM alertas_empresa_email WHERE empresa_id=2 ORDER BY id DESC LIMIT 1")).rows[0].status, 'falhou');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await worker.stop();
+    await db.close();
+  }
+});

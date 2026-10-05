@@ -136,6 +136,8 @@ test('worker mantém cursor, isola falhas, deduplica fontes, cria matches e não
   const diagnosticLogs = [];
   const worker = createOperationsService({database,config:{...config,EMAIL_ENABLED:'true'},logger:{info: data => diagnosticLogs.push(data), error: data => diagnosticLogs.push(data)},registry,emailService});
   try {
+    // The scheduled alert batch is not due: saving the match must itself trigger delivery.
+    await db.exec("INSERT INTO tarefas (nome,proxima_execucao) VALUES ('alertas',now()+interval '1 hour')");
     const pending = worker.runOnce();
     assert.equal(worker.runOnce(),pending);
     await pending;
