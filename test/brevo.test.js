@@ -74,11 +74,11 @@ test('automatic worker sends at 67 via the same Brevo function and logs context 
   const query = async (sql, params) => {
     if (sql.includes('pg_try_advisory_lock')) return { rows: [{ locked: true }] };
     if (sql.includes('SELECT * FROM tarefas')) return { rows: [{}] };
-    if (sql.includes('SELECT a.id') || sql.includes('INSERT INTO alertas')) {
+    if (sql.includes('SELECT DISTINCT ON (a.id)') || sql.includes('INSERT INTO alertas_empresa_email')) {
       assert.equal(params[0], 67, 'email threshold must override configured 80');
-      return { rows: sql.includes('SELECT a.id') ? [row] : [] };
+      return { rows: sql.includes('SELECT DISTINCT ON (a.id)') ? [row] : [] };
     }
-    if (sql.includes('FILTER (WHERE m.score>=67)')) assert.equal(params[0], 67);
+    if (sql.includes('RETURNING id')) return { rows: [{ id: row.id }] };
     return { rows: [] };
   };
   const worker = createOperationsService({ config: { ...config, ALERT_MIN_SCORE: 80 }, logger,
@@ -89,7 +89,7 @@ test('automatic worker sends at 67 via the same Brevo function and logs context 
     assert.equal(payloads.length, 2);
     assert.match(payloads[1].subject, /67%/);
     const expected = { empresa: row.razao_social, interesse: row.titulo, score: 67, destinatario: row.email };
-    for (const event of ['automatic.alert.start', 'email.api.success']) {
+    for (const event of ['automatic.alert.start', 'automatic.alert.success', 'email.api.success']) {
       assert.ok(logs.some(log => log.event === event && Object.entries(expected).every(([key, value]) => log[key] === value)));
     }
     fail = true;

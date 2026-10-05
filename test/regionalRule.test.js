@@ -65,14 +65,17 @@ test('regra regional filtra página, dashboard, novas filas e alertas pendentes 
     await db.exec(`INSERT INTO alertas (match_id,usuario_id,canal) SELECT m.id,1,c.canal FROM matches m
       JOIN licitacoes_pncp l ON l.id=m.licitacao_id CROSS JOIN (VALUES ('email'),('whatsapp')) c(canal)
       WHERE l.codigo_externo='regional-5';
+      INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id) SELECT 1,l.id,m.id FROM matches m
+        JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE l.codigo_externo='regional-5';
       INSERT INTO tarefas (nome,proxima_execucao) VALUES ('matches',now()+interval '1 day');`);
     const sent = { email: 0, whatsapp: 0 };
     const delivery = channel => ({ sendMatchAlert: async () => { sent[channel]++; return { accepted: true, messageId: 'test' }; } });
     worker = createOperationsService({ database, config: { EMAIL_ENABLED: 'true', WHATSAPP_ENABLED: 'true', ALERT_MIN_SCORE: 70 },
-      registry: createSourceRegistry(), logger: { error() {} }, emailService: delivery('email'), whatsappService: delivery('whatsapp') });
+      registry: createSourceRegistry(), logger: { info() {}, error() {} }, emailService: delivery('email'), whatsappService: delivery('whatsapp') });
     await worker.runOnce();
     assert.deepEqual(sent, { email: allowed.length, whatsapp: allowed.length });
     assert.equal((await db.query("SELECT count(*)::int AS n FROM alertas WHERE status='pendente'")).rows[0].n, 2);
+    assert.equal((await db.query("SELECT count(*)::int AS n FROM alertas_empresa_email WHERE status='pendente'")).rows[0].n, 1);
     await correlateOpportunities(database);
     assert.equal((await db.query('SELECT count(*)::int AS n FROM matches WHERE score>0')).rows[0].n, allowed.length);
     // Reimport enriches historic records without inserting or clearing known UF.

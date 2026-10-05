@@ -152,22 +152,18 @@ test('worker mantém cursor, isola falhas, deduplica fontes, cria matches e não
     await db.exec('UPDATE tarefas SET proxima_execucao=now()');
     await worker.runOnce();
     assert.equal(sends,1);
-    assert.equal((await db.query('SELECT status FROM alertas')).rows[0].status,'enviado');
-    await db.exec("UPDATE alertas SET status='pendente',tentativas=0; UPDATE usuarios SET alertas_email=false; UPDATE tarefas SET proxima_execucao=now()");
+    assert.equal((await db.query('SELECT status FROM alertas_empresa_email')).rows[0].status,'enviado');
+    await db.exec("UPDATE usuarios SET alertas_email=false; UPDATE tarefas SET proxima_execucao=now()");
     await worker.runOnce();
     assert.equal(sends,1);
-    emailBroken = true;
-    await db.exec("UPDATE usuarios SET alertas_email=true; UPDATE tarefas SET proxima_execucao=now(); UPDATE alertas SET proxima_tentativa=now()");
+    // A second interest for the same opportunity must not trigger another company email.
+    await db.exec("INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Outro',ARRAY['notebook']); UPDATE tarefas SET proxima_execucao=now()");
     await worker.runOnce();
-    const failedAttempt = (await db.query('SELECT status,tentativas,proxima_tentativa>now() AS delayed FROM alertas')).rows[0];
-    assert.deepEqual(failedAttempt,{status:'pendente',tentativas:1,delayed:true});
-    await db.exec("UPDATE tarefas SET proxima_execucao=now(); UPDATE alertas SET tentativas=4,proxima_tentativa=now()");
-    await worker.runOnce();
-    assert.equal((await db.query('SELECT status FROM alertas')).rows[0].status,'falhou');
+    assert.equal(sends,1);
     assert.ok(diagnosticLogs.some(x => x.event === 'search.start'));
     assert.ok(diagnosticLogs.some(x => x.event === 'matches.complete' && x.matches67 === 1));
     assert.ok(diagnosticLogs.some(x => x.event === 'alert.called'));
-    for (const reason of ['ja_enviado','preferencia_email_desativada']) {
+    for (const reason of ['ja_enviado']) {
       assert.ok(diagnosticLogs.some(x => x.event === 'email.eligibility' && x.motivo === reason && x.email_empresa === 'a@example.test'), reason);
     }
   } finally { await worker.stop();await db.close(); }
@@ -191,4 +187,46 @@ test('cron impede sobreposição e continua após falha; email escapa conteúdo 
   assert.ok(!result.html.includes('<script>'));
   assert.ok(result.html.includes('&lt;script&gt;'));
   for (const score of [Infinity,NaN,-1,101]) await assert.rejects(email.sendMatchAlert({...payload,score}));
+});
+
+test('email automático usa empresa sem usuários, preserva histórico e limita cada oportunidade a um envio', async () => {
+  const db = new PGlite();
+  const migrations = await readMigrations();
+  for (const migration of migrations.filter(m => !m.name.startsWith('010_'))) await db.exec(migration.sql);
+  await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES ('Empresa','11222333000181','empresa@example.test');
+    INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo) VALUES (1,'Gestor','usuario@example.test','$2b$12$' || repeat('x',53),'gestor');
+    INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Compra',ARRAY['notebook','compra','extra']);`);
+  await persistPncpItems(db,[item]);
+  await correlateOpportunities(db);
+  await db.exec("INSERT INTO alertas (match_id,usuario_id,status,enviado_em) VALUES (1,1,'enviado',now())");
+  await db.exec(migrations.find(m => m.name.startsWith('010_')).sql);
+  // New opportunity at exactly 67; company email does not require a user.
+  await persistPncpItems(db,[{...item,id:'nova',objeto:'Compra de notebooks novos',unidadeGestora:'Outro órgão'}]);
+  await correlateOpportunities(db);
+  await db.exec('DELETE FROM alertas; DELETE FROM usuarios');
+  const query = (sql,values) => sql.includes('pg_try_advisory_lock') ? Promise.resolve({rows:[{locked:true}]}) : sql.includes('pg_advisory_unlock') ? Promise.resolve({rows:[]}) : db.query(sql,values);
+  const logs = [], deliveries = [];
+  let failDelivery = false;
+  const worker = createOperationsService({database:{connect:async()=>({query,release(){}})},
+    config:{...config,EMAIL_ENABLED:'true'},registry:{listSources:()=>[]},
+    logger:{info:data=>logs.push(data),error:data=>logs.push(data)},
+    emailService:createEmailService({from:'alerts@example.test',transport:{sendMail:async payload=>{deliveries.push(payload);if (failDelivery) throw new Error('API indisponível');return {messageId:'new'};}}})});
+  try {
+    await worker.runOnce();
+    await db.exec('UPDATE tarefas SET proxima_execucao=now()');
+    await worker.runOnce();
+    assert.equal(deliveries.length,1);
+    assert.equal(deliveries[0].to,'empresa@example.test');
+    assert.match(deliveries[0].subject,/67%/);
+    assert.equal((await db.query("SELECT count(*)::int AS n FROM alertas_empresa_email WHERE status='enviado'")).rows[0].n,2);
+    for (const event of ['automatic.alert.start','automatic.alert.success','automatic.alert.skipped']) assert.ok(logs.some(l=>l.event===event));
+    failDelivery = true;
+    await persistPncpItems(db,[{...item,id:'falha',objeto:'Compra de notebooks especial',unidadeGestora:'Terceiro órgão'}]);
+    await db.exec('UPDATE tarefas SET proxima_execucao=now()');
+    await worker.runOnce();
+    await db.exec('UPDATE tarefas SET proxima_execucao=now()');
+    await worker.runOnce();
+    assert.equal(deliveries.length,2, 'não repete uma chamada que pode ter sido aceita antes de falhar');
+    assert.equal((await db.query("SELECT count(*)::int AS n FROM alertas_empresa_email WHERE status='falhou'")).rows[0].n,1);
+  } finally { await worker.stop(); await db.close(); }
 });

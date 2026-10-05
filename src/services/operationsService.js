@@ -53,35 +53,87 @@ export function createOperationsService({ database, config, logger, registry, em
 
   async function diagnoseEmail(client) {
     const { rows } = await client.query(`SELECT e.id AS empresa_id,e.razao_social,e.email AS email_empresa,
-      u.email AS destinatario, count(DISTINCT m.licitacao_id)::int AS licitacoes,
-      count(DISTINCT m.licitacao_id) FILTER (WHERE m.score>=67)::int AS matches_67,
-      CASE WHEN $2<>'true' THEN 'EMAIL_ENABLED=false'
+      m.licitacao_id,m.score,
+      CASE WHEN $1<>'true' THEN 'EMAIL_ENABLED=false'
         WHEN e.status<>'ativo' THEN 'empresa_inativa'
-        WHEN u.id IS NULL THEN 'sem_usuario_destinatario'
-        WHEN u.ativo=false THEN 'usuario_inativo'
-        WHEN u.alertas_email=false THEN 'preferencia_email_desativada'
-        WHEN m.id IS NULL THEN 'sem_match'
+        WHEN trim(e.email)='' THEN 'sem_email_empresa'
+        WHEN m.score<67 THEN 'score_abaixo_do_limite'
         WHEN i.ativo=false THEN 'interesse_inativo'
-        WHEN m.score<$1 THEN 'score_abaixo_do_limite'
         WHEN m.status NOT IN ('novo','aceito') THEN 'status_match_nao_elegivel'
         WHEN NOT licitacao_permitida(l.modalidade,l.uf) THEN 'modalidade_ou_uf_nao_permitida'
         WHEN a.status='enviado' THEN 'ja_enviado'
-        WHEN a.status='falhou' OR a.tentativas>=5 THEN 'tentativas_esgotadas'
-        WHEN a.proxima_tentativa>now() THEN 'aguardando_nova_tentativa'
+        WHEN a.status='enviando' THEN 'envio_em_andamento_ou_resultado_incerto'
+        WHEN a.status='falhou' THEN 'envio_falhou'
         ELSE 'elegivel_aguardando_lote' END AS motivo
-      FROM empresas e LEFT JOIN usuarios u ON u.empresa_id=e.id
-      LEFT JOIN matches m ON m.empresa_id=e.id
-      LEFT JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=e.id
-      LEFT JOIN licitacoes_pncp l ON l.id=m.licitacao_id
-      LEFT JOIN alertas a ON a.match_id=m.id AND a.usuario_id=u.id AND a.canal='email'
-      GROUP BY e.id,e.razao_social,e.email,u.email,motivo`, [emailMinScore,config.EMAIL_ENABLED]);
-    for (const row of rows) logger.info({ event: 'email.eligibility', ...row,
-      envio: row.motivo === 'elegivel_aguardando_lote' ? 'aguardando_lote' : 'ignorado',
-      alertMinScore: emailMinScore }, 'Empresa analisada para envio de e-mail');
+      FROM empresas e JOIN matches m ON m.empresa_id=e.id
+      JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=e.id
+      JOIN licitacoes_pncp l ON l.id=m.licitacao_id
+      LEFT JOIN alertas_empresa_email a ON a.empresa_id=e.id AND a.licitacao_id=m.licitacao_id`, [config.EMAIL_ENABLED]);
+    for (const row of rows) {
+      logger.info({ event: 'email.eligibility', ...row, alertMinScore: emailMinScore }, 'Empresa analisada para envio de e-mail');
+      if (row.motivo !== 'elegivel_aguardando_lote') logger.info({ event: 'automatic.alert.skipped', ...row, reason: row.motivo }, 'Alerta automático ignorado');
+    }
+  }
+
+  async function companyEmailAlerts(client) {
+    await diagnoseEmail(client);
+    await client.query(`INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id)
+      SELECT DISTINCT ON (m.empresa_id,m.licitacao_id) m.empresa_id,m.licitacao_id,m.id
+      FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
+      JOIN empresas e ON e.id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
+      WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
+        AND e.status='ativo' AND trim(e.email)<>'' AND licitacao_permitida(l.modalidade,l.uf)
+      ORDER BY m.empresa_id,m.licitacao_id,m.score DESC,m.id
+      ON CONFLICT (empresa_id,licitacao_id) DO NOTHING`, [emailMinScore]);
+    const { rows } = await client.query(`SELECT DISTINCT ON (a.id) a.id,a.empresa_id,a.licitacao_id,e.email,e.razao_social,i.titulo,m.score,
+      l.objeto,l.modalidade,l.unidade_gestora FROM alertas_empresa_email a
+      JOIN matches m ON m.empresa_id=a.empresa_id AND m.licitacao_id=a.licitacao_id
+      JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
+      JOIN empresas e ON e.id=a.empresa_id JOIN licitacoes_pncp l ON l.id=a.licitacao_id
+      WHERE a.status='pendente' AND e.status='ativo' AND trim(e.email)<>'' AND i.ativo=true
+        AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf)
+      ORDER BY a.id,m.score DESC,m.id LIMIT 25`, [emailMinScore]);
+    let sent = 0, failed = 0;
+    const seen = new Set();
+    for (const row of rows) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      if (seen.size > 25) break;
+      const context = { alertId: row.id, empresaId: row.empresa_id, licitacaoId: row.licitacao_id,
+        empresa: row.razao_social, interesse: row.titulo, score: row.score, destinatario: row.email };
+      if (stopped) {
+        logger.info({ ...context, event: 'automatic.alert.skipped', reason: 'worker_encerrando' }, 'Alerta automático ignorado');
+        break;
+      }
+      // Persist the claim before HTTP. An interrupted/ambiguous send must never be retried automatically.
+      const claim = await client.query(`UPDATE alertas_empresa_email SET status='enviando'
+        WHERE id=$1 AND status='pendente' RETURNING id`, [row.id]);
+      if (!claim.rows.length) {
+        logger.info({ ...context, event: 'automatic.alert.skipped', reason: 'ja_processado' }, 'Alerta automático ignorado');
+        continue;
+      }
+      logger.info({ ...context, event: 'alert.called', channel: 'email', recipient: row.email }, 'Envio chamado');
+      logger.info({ ...context, event: 'automatic.alert.start' }, 'Início do alerta automático');
+      try {
+        const result = await emailService.sendMatchAlert({ to: row.email, customer: row.razao_social,
+          interestName: row.titulo, score: row.score, context,
+          item: { objeto: row.objeto, modalidade: row.modalidade, unidadeGestora: row.unidade_gestora } });
+        await client.query(`UPDATE alertas_empresa_email SET status='enviado',enviado_em=now(),
+          provedor_mensagem_id=$2 WHERE id=$1`, [row.id,result?.messageId || null]);
+        logger.info({ ...context, event: 'automatic.alert.success', messageId: result?.messageId }, 'Alerta automático enviado');
+        sent++;
+      } catch (error) {
+        await client.query("UPDATE alertas_empresa_email SET status='falhou' WHERE id=$1", [row.id]);
+        logger.error({ ...context, event: 'automatic.alert.failed', error: emailError(error, config) }, 'Falha no alerta automático');
+        failed++;
+      }
+    }
+    return { sent, failed };
   }
 
   async function alerts(client,channel) {
-    const minScore = channel === 'email' ? emailMinScore : config.ALERT_MIN_SCORE;
+    if (channel === 'email') return companyEmailAlerts(client);
+    const minScore = config.ALERT_MIN_SCORE;
     if (channel === 'email') await diagnoseEmail(client);
     const preference = `(($2='email' AND u.alertas_email=true) OR
       ($2='whatsapp' AND u.alertas_whatsapp=true AND u.whatsapp_numero<>''
@@ -200,7 +252,7 @@ export function createOperationsService({ database, config, logger, registry, em
     },
     async overview() {
       const tasks = (await database.query('SELECT * FROM tarefas ORDER BY nome')).rows;
-      const alerts = (await database.query('SELECT canal,status,count(*)::int AS total FROM alertas GROUP BY canal,status ORDER BY canal,status')).rows;
+      const alerts = (await database.query(`SELECT canal,status,count(*)::int AS total FROM (SELECT canal,status FROM alertas WHERE canal='whatsapp' UNION ALL SELECT 'email' AS canal,status FROM alertas_empresa_email) deliveries GROUP BY canal,status ORDER BY canal,status`)).rows;
       return { tasks,alerts,workerEnabled: config.WORKER_ENABLED === 'true',emailEnabled: config.EMAIL_ENABLED === 'true',whatsappEnabled:config.WHATSAPP_ENABLED==='true',
         diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', emailFields(config)), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) },
         sources: registry.listSources(true).map(({ id,name,enabled }) => ({ id,name,enabled })) };
