@@ -1,3 +1,5 @@
+import { companyPlan, plans } from './planService.js';
+import { opportunityService } from './opportunityService.js';
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import { HttpError } from '../utils/httpError.js';
@@ -27,10 +29,28 @@ export function accountService(database) {
       return user;
     },
     async createUser(empresaId, data) {
-      return repository.createUser(empresaId, data, await hashPassword(data.senha));
+      const hash = await hashPassword(data.senha);
+      return repository.transaction(async transaction => {
+        await transaction.lockCompany(empresaId);
+        await transaction.assertCapacity(empresaId);
+        return transaction.createUser(empresaId, data, hash);
+      });
     },
     async getDashboard(empresaId) {
-      return repository.getDashboard(empresaId);
+      const dashboard = await repository.getDashboard(empresaId);
+      if (await companyPlan(database, empresaId) === 'start') {
+        delete dashboard.maior_score;
+        dashboard.topMatches = [];
+        dashboard.oportunidades_totais = (await opportunityService(database).search(empresaId, { q: '', segmento: '', page: 1 })).total;
+      }
+      return dashboard;
+    },
+    async changePlan(empresaId, plano) {
+      if (typeof plano !== 'string' || !Object.hasOwn(plans, plano)) throw new HttpError(422, 'Selecione Start, Pro ou Premium.');
+      return repository.transaction(async transaction => {
+        await transaction.lockCompany(empresaId);
+        return transaction.changePlan(empresaId, plano);
+      });
     },
     async getAdminOverview() {
       return repository.getAdminOverview();
@@ -44,6 +64,8 @@ export function accountService(database) {
         if (!currentActor?.ativo || !['gestor', 'admin'].includes(currentActor.tipo) || currentActor.empresa_status !== 'ativo') {
           throw new HttpError(403, 'Seu acesso de gestor não está mais ativo');
         }
+        const target = await transaction.getUser(actor.empresa_id, id);
+        if (target && !target.ativo && data.ativo) await transaction.assertCapacity(actor.empresa_id);
         const user = await transaction.updateUser(actor.empresa_id, id, data);
         if (!user) throw new HttpError(404, 'Usuário não encontrado');
         return user;

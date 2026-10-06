@@ -61,7 +61,7 @@
               <tr>
                 <th>Empresa</th>
                 <th>CNPJ</th>
-                <th>Status</th>
+                <th>Status</th><th>Plano</th>
                 <th>Usuários</th>
                 <th>Interesses</th>
                 <th>Matches</th>
@@ -73,6 +73,13 @@
                   <td><strong><%= empresa.razao_social %></strong><br><small class="muted"><%= empresa.nome_fantasia || 'Sem nome fantasia' %></small></td>
                   <td><%= empresa.cnpj %></td>
                   <td><span class="badge"><%= empresa.status %></span></td>
+                  <td><form method="post" action="/admin/empresas/<%= empresa.id %>/plano" class="stack">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <label>Plano de <%= empresa.razao_social %><select name="plano">
+                    <% for (const [value,label] of Object.entries({ start: 'Start', pro: 'Pro', premium: 'Premium' })) { %>
+                      <option value="<%= value %>" <%= empresa.plano === value ? 'selected' : '' %>><%= label %></option>
+                    <% } %></select></label><button class="button small">Salvar plano</button>
+                  </form></td>
                   <td><%= empresa.usuarios_ativos ?? 0 %></td>
                   <td><%= empresa.interesses_ativos ?? 0 %></td>
                   <td><%= empresa.oportunidades_totais ?? 0 %></td>

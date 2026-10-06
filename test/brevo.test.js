@@ -119,6 +119,8 @@ test('persisted matches trigger Brevo immediately, cross 67, log skips and dedup
   const item = { id: 'saved-match', dataAbertura: '2026-10-10T12:00:00Z', objeto: 'Compra de notebooks', modalidade: 'Pregão Eletrônico', unidadeGestora: 'Secretaria' };
   try {
     for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
     await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES
       ('Primeira','11222333000181','first@example.test'),('Segunda','11444777000161','second@example.test');
       INSERT INTO interesses (empresa_id,titulo,palavras) VALUES

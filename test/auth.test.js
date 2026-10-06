@@ -33,6 +33,8 @@ test('validação de CNPJ e limites bcrypt em bytes', () => {
 test('autenticação e isolamento com SQL e sessões persistidas', async t => {
   const db = new PGlite();
   for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
   // Adaptador de pool: consultas e session store reais, sem mocks de autorização ou SQL.
   const database = {
     query: (sql, values) => db.query(sql, values),
@@ -299,6 +301,8 @@ test('seed cria empresa/gestor com bcrypt e é idempotente em banco vazio', asyn
   };
   try {
     for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
     const env = { NODE_ENV: 'development', SEED_USER_EMAIL: 'seed@example.test', SEED_USER_PASSWORD: password };
     assert.equal(await seedDevelopment(database, env), true);
     assert.equal(await seedDevelopment(database, env), false);
@@ -318,6 +322,8 @@ test('seed cria empresa/admin quando a role for informada', async () => {
   };
   try {
     for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
     const env = {
       NODE_ENV: 'development',
       SEED_USER_ROLE: 'admin',

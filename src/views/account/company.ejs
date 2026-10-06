@@ -1,7 +1,7 @@
 <%- include('../partials/head') %>
 <%- include('../partials/nav') %>
 <main class="page narrow">
-  <header class="page-heading"><span class="eyebrow">DADOS CADASTRAIS</span><h1>Sua empresa</h1><p class="muted">CNPJ: <%= company.cnpj %> · Plano: <%= company.plano %> · Status: <%= company.status %></p></header>
+  <header class="page-heading"><span class="eyebrow">DADOS CADASTRAIS</span><h1>Sua empresa</h1><p class="muted">CNPJ: <%= company.cnpj %> · Plano: <%= { start: 'Start', pro: 'Pro', premium: 'Premium' }[company.plano] %> · Status: <%= company.status %></p></header>
   <% if (saved) { %><p class="notice" role="status">Dados da empresa atualizados.</p><% } %>
   <form method="post" action="/empresa" class="panel stack">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">

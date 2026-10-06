@@ -1,3 +1,4 @@
+import { validId } from '../utils/validation.js';
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { accountService } from '../services/accountService.js';
@@ -47,6 +48,13 @@ export function accountRoutes(database, config) {
     await req.app.locals.operations.schedule();
     res.redirect(303,'/admin/operacao?agendado=1');
   });
+  const changePlan = async (req, res) => {
+    const company = await service.changePlan(validId(req.params.id), req.body.plano);
+    if (req.path.startsWith('/api/')) return res.json({ company });
+    res.redirect(303, '/admin');
+  };
+  router.post('/admin/empresas/:id/plano', requireAuth, requireAdmin, changePlan);
+  router.patch('/api/admin/empresas/:id/plano', requireAuth, requireAdmin, changePlan);
   router.get('/api/admin/empresas', requireAuth, requireAdmin, controller.adminEmpresas);
   router.get('/conta', requireAuth, controller.accountPage);
   router.post(['/conta/senha', '/api/auth/password'], requireAuth, loginLimit, controller.changePassword);

@@ -1,0 +1,26 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page">
+  <h1>Busca por segmento</h1>
+  <p>Licitações importadas automaticamente, filtradas pelas palavras-chave dos seus interesses. <a href="/interesses">Gerenciar segmentos e interesses</a>.</p>
+  <% if (user.plano === 'start') { %><p class="notice">Match de compatibilidade e alertas por e-mail exigem upgrade para Pro ou Premium.</p><% } %>
+  <form method="get" class="panel grid two">
+    <label>Buscar no objeto<input name="q" maxlength="150" value="<%= filters.q %>"></label>
+    <label>Segmento / interesse<select name="segmento"><option value="">Todos os interesses ativos</option>
+      <% for (const interest of interests.filter(i => i.ativo)) { %><option value="<%= interest.id %>" <%= String(interest.id) === filters.segmento ? 'selected' : '' %>><%= interest.titulo %></option><% } %>
+    </select></label><button class="button">Filtrar</button>
+  </form>
+  <p><%= total %> resultado(s)</p>
+  <% for (const item of items) { %>
+    <article class="panel section-gap"><h2><%= item.objeto %></h2><p><%= item.unidade_gestora %> · <%= item.modalidade %> · <%= item.uf %></p><p>Fonte: <%= item.origem %></p>
+    <% const pncpId = /^(\d{14})-1-(\d+)-(\d{4})$/.exec(item.codigo_externo); if (pncpId) { %><a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/editais/<%= pncpId[1] %>/<%= pncpId[3] %>/<%= Number(pncpId[2]) %>">Consultar edital no PNCP</a><% } %>
+    </article>
+  <% } %>
+  <% if (!items.length) { %><p>Nenhuma oportunidade encontrada. Revise os interesses e filtros.</p><% } %>
+  <nav aria-label="Paginação" class="section-gap">
+    <% if (filters.page > 1) { %><a href="?page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;segmento=<%= filters.segmento %>">Anterior</a><% } %>
+    Página <%= filters.page %> de <%= pages %>
+    <% if (filters.page < pages) { %><a href="?page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;segmento=<%= filters.segmento %>">Próxima</a><% } %>
+  </nav>
+</main></div>
+<%- include('../partials/footer') %>

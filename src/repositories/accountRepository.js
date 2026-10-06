@@ -1,7 +1,17 @@
+import { assertUserCapacity, plans } from '../services/planService.js';
+import { HttpError } from '../utils/httpError.js';
 const publicUserColumns = 'id, empresa_id, nome, email, tipo, ativo, created_at, updated_at';
 
 export function accountRepository(database) {
   return {
+    assertCapacity(empresaId) { return assertUserCapacity(database, empresaId); },
+    async changePlan(empresaId, plano) {
+      const count = await database.query('SELECT count(*)::int AS total FROM usuarios WHERE empresa_id=$1 AND ativo=true', [empresaId]);
+      if (count.rows[0].total > plans[plano].users) throw new HttpError(409, 'Desative usuários excedentes antes de reduzir o plano.');
+      const result = await database.query('UPDATE empresas SET plano=$2 WHERE id=$1 RETURNING *', [empresaId, plano]);
+      if (!result.rows[0]) throw new HttpError(404, 'Empresa não encontrada');
+      return result.rows[0];
+    },
     async lockCompany(empresaId) {
       await database.query('SELECT id FROM empresas WHERE id=$1 FOR UPDATE', [empresaId]);
     },
@@ -31,13 +41,13 @@ export function accountRepository(database) {
       return rows[0];
     },
     async findLogin(email) {
-      const { rows } = await database.query(`SELECT u.*, e.status AS empresa_status
+      const { rows } = await database.query(`SELECT u.*, e.plano, e.status AS empresa_status
         FROM usuarios u JOIN empresas e ON e.id=u.empresa_id WHERE lower(trim(u.email))=$1`, [email]);
       return rows[0];
     },
     async findSessionUser(id, empresaId) {
       const { rows } = await database.query(`SELECT u.id, u.empresa_id, u.nome, u.email, u.tipo, u.ativo,
-        u.auth_version, u.alertas_email, u.whatsapp_numero, u.alertas_whatsapp, e.status AS empresa_status, e.nome_fantasia, e.razao_social
+        u.auth_version, u.alertas_email, u.whatsapp_numero, u.alertas_whatsapp, e.plano, e.status AS empresa_status, e.nome_fantasia, e.razao_social
         FROM usuarios u JOIN empresas e ON e.id=u.empresa_id WHERE u.id=$1 AND u.empresa_id=$2`, [id, empresaId]);
       return rows[0];
     },

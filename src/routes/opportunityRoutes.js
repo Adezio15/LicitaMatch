@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { requireAuth, requireManager } from '../middlewares/auth.js';
 import { opportunityService, interestSchema, statusSchema, filterSchema, alertPreferenceSchema, whatsappPreferenceSchema } from '../services/opportunityService.js';
 import { validate, validId } from '../utils/validation.js';
+import { requireFeature, assertFeature } from '../services/planService.js';
 
 export function opportunityRoutes(database) {
   const router = Router();
   const service = opportunityService(database);
-  router.post(['/conta/whatsapp','/api/conta/whatsapp'],requireAuth,requireManager,async (req,res)=>{
+  router.post(['/conta/whatsapp','/api/conta/whatsapp'],requireAuth,requireManager,requireFeature('whatsapp'),async (req,res)=>{
     const data = validate(whatsappPreferenceSchema,req.body);
     await database.query(`UPDATE usuarios SET whatsapp_numero=$3,alertas_whatsapp=$4,
       whatsapp_consentimento_em=CASE WHEN $4 THEN now() ELSE NULL END WHERE id=$1 AND empresa_id=$2`,
@@ -14,7 +15,7 @@ export function opportunityRoutes(database) {
     if (req.path.startsWith('/api/')) return res.json({whatsapp_numero:data.whatsapp_numero,alertas_whatsapp:data.alertas_whatsapp});
     res.redirect(303,'/conta?alertas=salvos#whatsapp');
   });
-  router.post(['/conta/alertas','/api/conta/alertas'],requireAuth,async (req,res) => {
+  router.post(['/conta/alertas','/api/conta/alertas'],requireAuth,requireFeature('email'),async (req,res) => {
     const data = validate(alertPreferenceSchema,req.body);
     await database.query('UPDATE usuarios SET alertas_email=$3 WHERE id=$1 AND empresa_id=$2', [req.user.id,req.user.empresa_id,data.alertas_email]);
     if (req.path.startsWith('/api/')) return res.json(data);
@@ -34,7 +35,14 @@ export function opportunityRoutes(database) {
   router.post('/interesses/:id', requireAuth, requireManager, save);
   router.patch('/api/interesses/:id', requireAuth, requireManager, save);
   router.get(['/oportunidades','/api/oportunidades'], requireAuth, async (req,res) => {
-    const data = await service.list(req.user.empresa_id,validate(filterSchema,req.query));
+    const filters = validate(filterSchema,req.query);
+    if (req.user.plano === 'start') {
+      if (filters.score || filters.status) assertFeature(req.user.plano, 'match');
+      const data = await service.search(req.user.empresa_id, filters);
+      if (req.path.startsWith('/api/')) return res.json(data);
+      return res.render('account/search', { title: 'Oportunidades', ...data, interests: await service.interests(req.user.empresa_id) });
+    }
+    const data = await service.list(req.user.empresa_id,filters);
     if (req.path.startsWith('/api/')) return res.json(data);
     res.render('account/opportunities', { title: 'Oportunidades', ...data });
   });
@@ -45,5 +53,15 @@ export function opportunityRoutes(database) {
   };
   router.post('/oportunidades/:id',requireAuth,requireManager,update);
   router.patch('/api/oportunidades/:id',requireAuth,requireManager,update);
+  router.get(['/busca','/api/busca'], requireAuth, async (req,res) => {
+    const data = await service.search(req.user.empresa_id,validate(filterSchema,req.query));
+    if (req.path.startsWith('/api/')) return res.json(data);
+    res.render('account/search', { title: 'Busca por segmento', ...data, interests: await service.interests(req.user.empresa_id) });
+  });
+  router.get(['/relatorios','/api/relatorios'], requireAuth, requireFeature('reports'), async (req,res) => {
+    const items = await service.report(req.user.empresa_id);
+    if (req.path.startsWith('/api/')) return res.json({ items });
+    res.render('account/reports', { title: 'Relatórios', items });
+  });
   return router;
 }

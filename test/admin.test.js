@@ -14,6 +14,8 @@ const logger = createLogger('silent');
 test('admin global acessa painel geral e gestores comuns não acessam', async () => {
   const db = new PGlite();
   for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
   const database = { query: (sql, values) => db.query(sql, values), connect: async () => ({ query: (sql, values) => db.query(sql, values), release() {} }) };
   const app = createApp({ config, database, logger });
 

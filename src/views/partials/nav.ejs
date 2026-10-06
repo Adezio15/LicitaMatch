@@ -2,7 +2,7 @@
   <aside class="sidebar" aria-label="Menu lateral">
     <div class="sidebar-brand-wrap"><%- include('logo', { href: '/conta' }) %></div>
     <nav class="sidebar-nav" aria-label="Navegação principal">
-      <% const links = [['/conta','Minha conta'],['/interesses','Interesses'],['/oportunidades','Oportunidades'],['/empresa','Empresa']];
+      <% const links = [['/busca','Busca por segmento'],['/relatorios','Relatórios'],['/conta','Minha conta'],['/interesses','Interesses'],['/oportunidades','Oportunidades'],['/empresa','Empresa']];
       if (['gestor','admin'].includes(user.tipo)) links.push(['/usuarios','Usuários']);
       if (user.tipo === 'admin') links.push(['/admin','Admin'],['/admin/operacao','Operação e fontes']);
       for (const [href,label] of links) {
@@ -12,6 +12,6 @@
       <a class="nav-link" href="/conta#alertas">Alertas</a>
       <a class="nav-link" href="/conta#seguranca">Segurança</a>
     </nav>
-    <div class="sidebar-card"><h3><%= user.nome_fantasia || user.razao_social || 'Sua empresa' %></h3><p><%= { usuario:'Usuário', gestor:'Gestor', admin:'Administrador' }[user.tipo] %></p></div>
+    <div class="sidebar-card"><p>Plano <%= { start: 'Start', pro: 'Pro', premium: 'Premium' }[user.plano] %></p><h3><%= user.nome_fantasia || user.razao_social || 'Sua empresa' %></h3><p><%= { usuario:'Usuário', gestor:'Gestor', admin:'Administrador' }[user.tipo] %></p></div>
     <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button secondary" type="submit">Sair</button></form>
   </aside>

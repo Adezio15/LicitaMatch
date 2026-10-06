@@ -41,6 +41,8 @@ test('adapters leem Response real uma única vez e usam campos e parâmetros ofi
 test('fluxo HTTP: interesses, correlação, status, preferências, permissões e isolamento', async () => {
   const db = new PGlite();
   for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
   const database = { query:(sql,values) => db.query(sql,values),connect:async () => ({query:(sql,values)=>db.query(sql,values),release(){}}) };
   const app = createApp({config,database,logger});
   const a = request.agent(app), b = request.agent(app), member = request.agent(app);
@@ -120,6 +122,8 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
 test('worker mantém cursor, isola falhas, deduplica fontes, cria matches e não repete alertas enviados', async () => {
   const db = new PGlite();
   for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
   // PGlite has no session advisory locks; PostgreSQL lock behavior is checked separately.
   const query = (sql,values) => sql.includes('pg_try_advisory_lock') ? Promise.resolve({rows:[{locked:true}]}) : sql.includes('pg_advisory_unlock') ? Promise.resolve({rows:[]}) : db.query(sql,values);
   const database = {query,connect:async()=>({query,release(){}})};
@@ -195,6 +199,7 @@ test('email automático usa empresa sem usuários, preserva histórico e limita 
   const db = new PGlite();
   const migrations = await readMigrations();
   for (const migration of migrations.filter(m => !m.name.startsWith('010_'))) await db.exec(migration.sql);
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'pro'");
   await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES ('Empresa','11222333000181','empresa@example.test');
     INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo) VALUES (1,'Gestor','usuario@example.test','$2b$12$' || repeat('x',53),'gestor');
     INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Compra',ARRAY['notebook','compra','extra']);`);

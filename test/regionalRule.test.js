@@ -32,6 +32,8 @@ test('regra regional filtra página, dashboard, novas filas e alertas pendentes 
   let worker;
   try {
     for (const migration of await readMigrations()) await db.exec(migration.sql);
+  // Existing feature scenarios exercise a fully entitled company; plan boundaries have dedicated tests.
+  await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'premium'");
     await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES ('Empresa','11222333000181','a@example.test');
       INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo,alertas_email,whatsapp_numero,alertas_whatsapp,whatsapp_consentimento_em)
       VALUES (1,'Gestor','a@example.test','$2b$12$'||repeat('x',53),'gestor',true,'+5584999999999',true,now());

@@ -1,0 +1,9 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<main class="page"><h1>Relatório de oportunidades</h1><p>Resumo dos matches dos interesses ativos da sua empresa.</p>
+<section class="panel"><table><thead><tr><th>Situação</th><th>Matches</th><th>Compatibilidade média</th></tr></thead><tbody>
+<% const labels = { novo: 'Nova', revisado: 'Revisada', aceito: 'Aceita', recusado: 'Recusada' }; %>
+<% for (const item of items) { %><tr><td><%= labels[item.status] %></td><td><%= item.total %></td><td><%= item.score_medio %>%</td></tr><% } %>
+</tbody></table><% if (!items.length) { %><p>Nenhum match disponível para o relatório.</p><% } %></section>
+</main></div>
+<%- include('../partials/footer') %>

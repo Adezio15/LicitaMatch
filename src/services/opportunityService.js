@@ -1,3 +1,4 @@
+import { assertFeature, companyPlan } from './planService.js';
 import { z } from 'zod';
 import { HttpError } from '../utils/httpError.js';
 import { matchLicitacao } from './matchesService.js';
@@ -26,6 +27,7 @@ export const whatsappPreferenceSchema = z.object({
   }
 });
 export const filterSchema = z.object({
+  segmento: z.string().regex(/^[1-9][0-9]{0,17}$/).or(z.literal('')).default(''),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   status: z.enum(['', 'novo', 'revisado', 'aceito', 'recusado']).default(''),
   q: z.string().trim().max(150).default(''),
@@ -35,7 +37,7 @@ export const filterSchema = z.object({
 // Batches bound memory; the full persisted catalog is considered for new interests.
 export async function correlateOpportunities(database, empresaId = null, logger, onMatchSaved) {
   const { rows: interests } = await database.query(`SELECT i.* FROM interesses i
-    JOIN empresas e ON e.id=i.empresa_id WHERE i.ativo=true AND e.status='ativo'
+    JOIN empresas e ON e.id=i.empresa_id WHERE i.ativo=true AND e.status='ativo' AND e.plano IN ('pro','premium')
     AND ($1::bigint IS NULL OR i.empresa_id=$1)`, [empresaId]);
   logger?.info({ event: 'matches.start', interests: interests.length }, 'Início da análise de matches');
   const qualified = new Set();
@@ -72,6 +74,25 @@ export async function correlateOpportunities(database, empresaId = null, logger,
 
 export function opportunityService(database) {
   return {
+    async search(empresaId, filters) {
+      const where = `FROM licitacoes_pncp l WHERE licitacao_permitida(l.modalidade,l.uf)
+        AND ($2='' OR strpos(lower(l.objeto),lower($2))>0)
+        AND EXISTS (SELECT 1 FROM interesses i, unnest(i.palavras) palavra
+          WHERE i.empresa_id=$1 AND i.ativo=true AND ($3::bigint IS NULL OR i.id=$3)
+          AND strpos(lower(l.objeto),lower(palavra))>0)`;
+      const values = [empresaId, filters.q, filters.segmento || null];
+      const total = (await database.query(`SELECT count(*)::int AS total ${where}`, values)).rows[0].total;
+      const items = (await database.query(`SELECT l.id,l.objeto,l.modalidade,l.uf,l.origem,l.unidade_gestora,l.codigo_externo,l.data_abertura ${where} ORDER BY l.id DESC LIMIT 20 OFFSET $4`, [...values,(filters.page-1)*20])).rows;
+      return { items, total, pages: Math.max(1,Math.ceil(total/20)), filters };
+    },
+    async report(empresaId) {
+      assertFeature(await companyPlan(database, empresaId), 'reports');
+      return (await database.query(`SELECT m.status,count(*)::int AS total,round(avg(m.score))::int AS score_medio
+        FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
+        JOIN licitacoes_pncp l ON l.id=m.licitacao_id
+        WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)
+        GROUP BY m.status ORDER BY m.status`, [empresaId])).rows;
+    },
     async interests(empresaId) {
       return (await database.query('SELECT * FROM interesses WHERE empresa_id=$1 ORDER BY ativo DESC, titulo, id', [empresaId])).rows;
     },
@@ -85,6 +106,7 @@ export function opportunityService(database) {
       return rows[0];
     },
     async list(empresaId, filters) {
+      assertFeature(await companyPlan(database, empresaId), 'match');
       const values = [empresaId,filters.status,filters.q,filters.score];
       const where = `m.empresa_id=$1 AND i.empresa_id=$1 AND i.ativo=true
         AND ($2='' OR m.status=$2) AND ($3='' OR strpos(lower(l.objeto),lower($3))>0)
@@ -98,6 +120,7 @@ export function opportunityService(database) {
       return { items: rows, total, pages: Math.max(1,Math.ceil(total/20)), filters };
     },
     async updateStatus(empresaId, id, status) {
+      assertFeature(await companyPlan(database, empresaId), 'match');
       const { rows } = await database.query('UPDATE matches SET status=$3 WHERE empresa_id=$1 AND id=$2 RETURNING id,status', [empresaId,id,status]);
       if (!rows[0]) throw new HttpError(404, 'Oportunidade não encontrada');
       return rows[0];

@@ -62,7 +62,7 @@ test('fila envia por canal, isola falhas, respeita responsáveis e cancelamento,
   const database={query,connect:async()=>({query,release(){}})};
   let worker;
   try{
-    for(const migration of migrations.slice(0,-1)) await db.exec(migration.sql);
+    for(const migration of migrations.filter(m => m.name < '010')) await db.exec(migration.sql);
     await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES ('Empresa A','11222333000181','a@example.test'),('Empresa B','11444777000161','b@example.test');
       INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo,alertas_email) VALUES
       (1,'Responsável A','a@example.test','$2b$12$'||repeat('x',53),'gestor',true),
@@ -72,7 +72,8 @@ test('fila envia por canal, isola falhas, respeita responsáveis e cancelamento,
       INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade) VALUES ('WA-1','Compra de notebooks',now(),'Secretaria','Pregão Eletrônico');
       INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,1,1,100);
       INSERT INTO alertas (match_id,usuario_id,status) VALUES (1,1,'enviado');`);
-    await db.exec(migrations.at(-1).sql);
+    for (const migration of migrations.filter(m => m.name >= '010')) await db.exec(migration.sql);
+    await db.exec("UPDATE empresas SET plano='premium'");
     assert.equal((await db.query('SELECT canal FROM alertas')).rows[0].canal,'email');
     await db.exec(`UPDATE usuarios SET whatsapp_numero='+5584999999999',alertas_whatsapp=true,whatsapp_consentimento_em=now();`);
     let emailCalls=0,whatsappCalls=0,fail=true;

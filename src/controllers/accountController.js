@@ -4,7 +4,7 @@ import { validate, registerSchema, loginSchema, companySchema, userCreateSchema,
 import { HttpError } from '../utils/httpError.js';
 
 const isApi = req => req.path.startsWith('/api/');
-const safeUser = user => ({ id: user.id, empresa_id: user.empresa_id, nome: user.nome, email: user.email, tipo: user.tipo, ativo: user.ativo });
+const safeUser = user => ({ id: user.id, empresa_id: user.empresa_id, nome: user.nome, email: user.email, tipo: user.tipo, ativo: user.ativo, plano: user.plano });
 const getPostLoginRedirect = user => user?.tipo === 'admin' ? '/admin' : '/conta';
 const sessionOperation = (req, method) => new Promise((resolve, reject) => req.session[method](error => error ? reject(error) : resolve()));
 
