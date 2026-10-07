@@ -38,7 +38,12 @@ export function accountService(database) {
     },
     async getDashboard(empresaId) {
       const dashboard = await repository.getDashboard(empresaId);
-      if (await companyPlan(database, empresaId) === 'start') {
+      const plan = await companyPlan(database, empresaId);
+      if (plan === 'sem_plano') {
+        const summary = await opportunityService(database).summary(empresaId);
+        return { interesses_ativos: dashboard.interesses_ativos, usuarios_ativos: dashboard.usuarios_ativos, oportunidades_totais: summary.total, novas: summary.novas, topMatches: [] };
+      }
+      if (plan === 'start') {
         delete dashboard.maior_score;
         dashboard.topMatches = [];
         dashboard.oportunidades_totais = (await opportunityService(database).search(empresaId, { q: '', segmento: '', page: 1 })).total;

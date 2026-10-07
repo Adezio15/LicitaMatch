@@ -1,9 +1,10 @@
-import { assertUserCapacity, plans } from '../services/planService.js';
+import { assertUserCapacity, plans, companyPlan } from '../services/planService.js';
 import { HttpError } from '../utils/httpError.js';
 const publicUserColumns = 'id, empresa_id, nome, email, tipo, ativo, created_at, updated_at';
 
 export function accountRepository(database) {
   return {
+    effectivePlan(id) { return companyPlan(database, id); },
     assertCapacity(empresaId) { return assertUserCapacity(database, empresaId); },
     async changePlan(empresaId, plano) {
       const count = await database.query('SELECT count(*)::int AS total FROM usuarios WHERE empresa_id=$1 AND ativo=true', [empresaId]);
@@ -47,7 +48,7 @@ export function accountRepository(database) {
     },
     async findSessionUser(id, empresaId) {
       const { rows } = await database.query(`SELECT u.id, u.empresa_id, u.nome, u.email, u.tipo, u.ativo,
-        u.auth_version, u.alertas_email, u.whatsapp_numero, u.alertas_whatsapp, e.plano, e.status AS empresa_status, e.nome_fantasia, e.razao_social
+        u.auth_version, u.alertas_email, u.whatsapp_numero, u.alertas_whatsapp, e.plano, e.teste_status, e.teste_fim, e.teste_utilizado_em, e.status AS empresa_status, e.nome_fantasia, e.razao_social
         FROM usuarios u JOIN empresas e ON e.id=u.empresa_id WHERE u.id=$1 AND u.empresa_id=$2`, [id, empresaId]);
       return rows[0];
     },
@@ -89,7 +90,9 @@ export function accountRepository(database) {
         (SELECT count(*)::int FROM interesses WHERE empresa_id=$1 AND ativo=true) AS interesses_ativos,
         (SELECT count(*)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)) AS oportunidades_totais,
         (SELECT COALESCE(max(score), 0)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)) AS maior_score,
-        (SELECT count(*)::int FROM usuarios WHERE empresa_id=$1 AND ativo=true) AS usuarios_ativos`, [empresaId]);
+        (SELECT count(*)::int FROM usuarios WHERE empresa_id=$1 AND ativo=true) AS usuarios_ativos,
+        (SELECT count(DISTINCT m.licitacao_id)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND m.created_at>now()-interval '7 days' AND licitacao_permitida(l.modalidade,l.uf)) AS novas,
+        (SELECT COALESCE(round(avg(m.score)),0)::int FROM matches m JOIN interesses i ON i.id=m.interesse_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=$1 AND i.ativo=true AND m.score>0 AND licitacao_permitida(l.modalidade,l.uf)) AS score_medio`, [empresaId]);
       const { rows: matchesRows } = await database.query(`SELECT m.id, m.score, m.status, m.empresa_id,
         i.titulo AS interesse_titulo, l.objeto, l.modalidade, l.unidade_gestora, m.created_at
         FROM matches m

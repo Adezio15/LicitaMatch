@@ -1,0 +1,28 @@
+<%- include('../partials/head') %><%- include('../partials/nav') %><main class="page"><header class="page-heading"><h1>Segurança</h1><p>Gerencie sua senha e os acessos da empresa.</p></header>      <section class="panel" id="seguranca">
+        <h2>Segurança e acesso</h2>
+        <form method="post" action="/conta/senha" class="stack compact-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Senha atual<input type="password" name="senha_atual" autocomplete="current-password" required></label>
+          <label>Nova senha<input type="password" name="senha" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+          <small class="muted">Mínimo de 12 caracteres; máximo de 72 bytes.</small>
+          <button class="button" type="submit">Salvar nova senha</button>
+        </form>
+      </section>
+    <section class="panel section-gap profile-panel">
+      <div class="panel-header">
+        <h2>Perfil e permissões</h2>
+        <span class="badge profile-badge"><%= { usuario: 'Usuário', gestor: 'Gestor', admin: 'Administrador' }[user.tipo] %></span>
+      </div>
+      <ul class="permission-list">
+        <% const permissions = {
+          usuario: ['Consultar a própria empresa', 'Visualizar dados do seu acesso', 'Não alterar cadastros da organização'],
+          gestor: ['Editar dados da empresa', 'Gerenciar usuários da própria empresa', 'Criar e atualizar acessos do time'],
+          admin: ['Acesso administrativo da empresa', 'Gerenciar permissões internas da conta', 'Supervisionar empresas e processamento das fontes']
+        }[user.tipo]; %>
+        <% for (const permission of permissions) { %>
+          <li><span class="dot ok"></span><%= permission %></li>
+        <% } %>
+      </ul>
+    </section>
+
+<% if (['gestor','admin'].includes(user.tipo)) { %><section class="panel section-gap"><h2>Usuários e permissões</h2><a class="button" href="/usuarios">Gerenciar acessos</a></section><% } %></main></div><%- include('../partials/footer') %>

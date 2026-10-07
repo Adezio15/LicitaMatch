@@ -1,3 +1,4 @@
+import { plans } from './services/planService.js';
 import express from 'express';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
@@ -11,6 +12,7 @@ import { createOperationsService } from './services/operationsService.js';
 
 export function createApp({ config, database, logger, operationsDatabase = database }) {
   const app = express();
+  app.locals.planCatalog = plans;
   app.disable('x-powered-by');
   app.set('trust proxy', config.TRUST_PROXY_HOPS);
   app.set('views', fileURLToPath(new URL('./views', import.meta.url)));
@@ -34,7 +36,7 @@ export function createApp({ config, database, logger, operationsDatabase = datab
   app.locals.sessionStore = sessions.store;
   app.locals.operations = createOperationsService({ database: operationsDatabase, config, logger });
   app.use(sessions.middleware);
-  app.use(accountRoutes(database, config));
+  app.use(accountRoutes(database, config, logger));
   app.use((_req, res) => res.status(404).json({ error: 'Página não encontrada' }));
   app.use(errorHandler(logger));
   return app;

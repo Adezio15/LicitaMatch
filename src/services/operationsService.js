@@ -1,3 +1,4 @@
+import { premiumTrialService } from './premiumTrialService.js';
 import { sendEmail, sendTestEmail, emailError } from './emailDiagnostics.js';
 import { createPncpSource } from './sources/pncpSource.js';
 import { createComprasnetSource } from './sources/comprasnetSource.js';
@@ -55,7 +56,7 @@ export function createOperationsService({ database, config, logger, registry, em
     const { rows } = await client.query(`SELECT e.id AS empresa_id,e.razao_social,e.email AS email_empresa,
       m.licitacao_id,m.score,
       CASE WHEN $1<>'true' THEN 'EMAIL_ENABLED=false'
-        WHEN e.plano NOT IN ('pro','premium') THEN 'plano_sem_email'
+        WHEN plano_efetivo(e) NOT IN ('pro','premium') THEN 'plano_sem_email'
         WHEN e.status<>'ativo' THEN 'empresa_inativa'
         WHEN trim(e.email)='' THEN 'sem_email_empresa'
         WHEN m.score<67 THEN 'score_abaixo_do_limite'
@@ -86,7 +87,7 @@ export function createOperationsService({ database, config, logger, registry, em
       JOIN empresas e ON e.id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
       WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
         AND ($2::bigint IS NULL OR m.empresa_id=$2) AND ($3::bigint IS NULL OR m.licitacao_id=$3)
-        AND e.plano IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND licitacao_permitida(l.modalidade,l.uf)
+        AND plano_efetivo(e) IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND licitacao_permitida(l.modalidade,l.uf)
       ORDER BY m.empresa_id,m.licitacao_id,m.score DESC,m.id
       ON CONFLICT (empresa_id,licitacao_id) DO NOTHING`, [emailMinScore, target?.empresaId ?? null, target?.licitacaoId ?? null]);
     const { rows } = await client.query(`SELECT DISTINCT ON (a.id) a.id,a.empresa_id,a.licitacao_id,e.email,e.razao_social,i.titulo,m.score,
@@ -94,7 +95,7 @@ export function createOperationsService({ database, config, logger, registry, em
       JOIN matches m ON m.empresa_id=a.empresa_id AND m.licitacao_id=a.licitacao_id
       JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
       JOIN empresas e ON e.id=a.empresa_id JOIN licitacoes_pncp l ON l.id=a.licitacao_id
-      WHERE a.status='pendente' AND e.plano IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND i.ativo=true
+      WHERE a.status='pendente' AND plano_efetivo(e) IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND i.ativo=true
         AND ($2::bigint IS NULL OR a.empresa_id=$2) AND ($3::bigint IS NULL OR a.licitacao_id=$3)
         AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf)
       ORDER BY a.id,m.score DESC,m.id LIMIT 25`, [emailMinScore, target?.empresaId ?? null, target?.licitacaoId ?? null]);
@@ -114,7 +115,7 @@ export function createOperationsService({ database, config, logger, registry, em
       const claim = await client.query(`UPDATE alertas_empresa_email SET status='enviando'
         WHERE id=$1 AND status='pendente'
         AND EXISTS (SELECT 1 FROM empresas e WHERE e.id=alertas_empresa_email.empresa_id
-          AND e.status='ativo' AND e.plano IN ('pro','premium')) RETURNING id`, [row.id]);
+          AND e.status='ativo' AND plano_efetivo(e) IN ('pro','premium')) RETURNING id`, [row.id]);
       if (!claim.rows.length) {
         logger.info({ ...context, event: 'automatic.alert.skipped', reason: 'ja_processado' }, 'Alerta automático ignorado');
         continue;
@@ -154,7 +155,7 @@ export function createOperationsService({ database, config, logger, registry, em
   async function alerts(client,channel) {
     if (channel === 'email') return companyEmailAlerts(client);
     const minScore = config.ALERT_MIN_SCORE;
-    const preference = `(e.plano='premium' AND u.alertas_whatsapp=true AND u.whatsapp_numero<>''
+    const preference = `(plano_efetivo(e)='premium' AND u.alertas_whatsapp=true AND u.whatsapp_numero<>''
       AND u.whatsapp_consentimento_em IS NOT NULL AND u.tipo IN ('gestor','admin'))`;
     await client.query(`INSERT INTO alertas (match_id,usuario_id,canal)
       SELECT m.id,u.id,$2 FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
@@ -176,7 +177,7 @@ export function createOperationsService({ database, config, logger, registry, em
     for (const row of rows) {
       if (stopped) { logger.info({ event: 'alert.skipped', channel, reason: 'worker_encerrando' }, 'Envio ignorado'); break; }
       // Recheck after batch selection: an admin may have changed the plan meanwhile.
-      const eligible = await client.query("SELECT id FROM empresas WHERE id=$1 AND status='ativo' AND plano='premium'", [row.empresa_id]);
+      const eligible = await client.query("SELECT id FROM empresas WHERE id=$1 AND status='ativo' AND plano_efetivo(empresas)='premium'", [row.empresa_id]);
       if (!eligible.rows.length) continue;
       logger.info({ event: 'alert.called', channel, alertId: row.id, empresa: row.razao_social, recipient: channel === 'email' ? row.email : row.whatsapp_numero }, 'Envio chamado');
       const context = { alertId: row.id, empresa: row.razao_social, interesse: row.titulo, score: row.score,
@@ -200,6 +201,8 @@ export function createOperationsService({ database, config, logger, registry, em
   }
 
   async function cycle() {
+    // Drain notifications before reserving the worker connection, including pools of size one.
+    await premiumTrialService(database,config,logger).flushEmails();
     const client = await database.connect();
     let locked = false;
     try {

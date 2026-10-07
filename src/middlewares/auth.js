@@ -13,6 +13,9 @@ export function loadUser(repository, config) {
       if (req.path.startsWith('/api/')) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
       return res.redirect(303, '/login');
     }
+    user.plano_contratado = user.plano;
+    user.plano = await repository.effectivePlan(user.empresa_id);
+    if (user.teste_status === 'ativo' && new Date(user.teste_fim).getTime() <= Date.now()) user.teste_status = 'expirado';
     req.user = user;
     res.locals.user = user;
     next();

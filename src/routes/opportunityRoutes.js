@@ -35,6 +35,11 @@ export function opportunityRoutes(database) {
   router.post('/interesses/:id', requireAuth, requireManager, save);
   router.patch('/api/interesses/:id', requireAuth, requireManager, save);
   router.get(['/oportunidades','/api/oportunidades'], requireAuth, async (req,res) => {
+    if (req.user.plano === 'sem_plano') {
+      const summary = await service.summary(req.user.empresa_id);
+      if (req.path.startsWith('/api/')) return res.json(summary);
+      return res.render('account/locked',{title:'Oportunidades',summary});
+    }
     const filters = validate(filterSchema,req.query);
     if (req.user.plano === 'start') {
       if (filters.score || filters.status) assertFeature(req.user.plano, 'match');
@@ -46,6 +51,12 @@ export function opportunityRoutes(database) {
     if (req.path.startsWith('/api/')) return res.json(data);
     res.render('account/opportunities', { title: 'Oportunidades', ...data });
   });
+  router.get(['/oportunidades/:id','/api/oportunidades/:id'],requireAuth,async(req,res)=>{
+    if(req.user.plano==='sem_plano') return res.status(403).json({error:'Assinatura necessária'});
+    const item = await service.detail(req.user.empresa_id,validId(req.params.id));
+    if (req.path.startsWith('/api/')) return res.json({item});
+    res.render('account/opportunity',{title:'Oportunidade',item});
+  });
   const update = async (req,res) => {
     const match = await service.updateStatus(req.user.empresa_id,validId(req.params.id),validate(statusSchema,req.body).status);
     if (req.path.startsWith('/api/')) return res.json({ match });
@@ -54,6 +65,11 @@ export function opportunityRoutes(database) {
   router.post('/oportunidades/:id',requireAuth,requireManager,update);
   router.patch('/api/oportunidades/:id',requireAuth,requireManager,update);
   router.get(['/busca','/api/busca'], requireAuth, async (req,res) => {
+    if (req.user.plano === 'sem_plano') {
+      const summary = await service.summary(req.user.empresa_id);
+      if (req.path.startsWith('/api/')) return res.json(summary);
+      return res.render('account/locked',{title:'Oportunidades',summary});
+    }
     const data = await service.search(req.user.empresa_id,validate(filterSchema,req.query));
     if (req.path.startsWith('/api/')) return res.json(data);
     res.render('account/search', { title: 'Busca por segmento', ...data, interests: await service.interests(req.user.empresa_id) });

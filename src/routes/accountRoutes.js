@@ -1,3 +1,4 @@
+import { premiumTrialService } from '../services/premiumTrialService.js';
 import { validId } from '../utils/validation.js';
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
@@ -7,7 +8,7 @@ import { loadUser, requireAuth, requireManager, requireAdmin } from '../middlewa
 import { csrf } from '../middlewares/csrf.js';
 import { opportunityRoutes } from './opportunityRoutes.js';
 
-export function accountRoutes(database, config) {
+export function accountRoutes(database, config, logger) {
   const router = Router();
   const service = accountService(database);
   const controller = accountController(service, config);
@@ -18,6 +19,34 @@ export function accountRoutes(database, config) {
 
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(loadUser(service.repository, config), csrf);
+  const trials = premiumTrialService(database, config, logger);
+  router.post(['/conta/teste-premium','/api/testes-premium'], requireAuth, async (req,res) => {
+    const result = await trials.request(req.user,{ip:req.ip,userAgent:(req.get('user-agent') || '').slice(0,2000)});
+    if (req.path.startsWith('/api/')) return res.status(201).json(result);
+    res.redirect(303,'/conta?teste=solicitado');
+  });
+  router.post(['/conta/contratar','/api/planos/contratar'],requireAuth,requireManager,async (req,res)=>{
+    const result = await trials.contract(req.user,req.body.plano);
+    if (req.path.startsWith('/api/')) return res.status(202).json(result);
+    res.render('account/message',{title:'Contratação',message:result.message});
+  });
+  router.get(['/admin/testes-premium','/api/admin/testes-premium'],requireAuth,requireAdmin,async(req,res)=>{
+    const trialsList = await trials.list();
+    if(req.path.startsWith('/api/')) return res.json({trials:trialsList});
+    res.render('account/trials',{title:'Testes Premium',trials:trialsList});
+  });
+  router.get('/api/admin/testes-premium/:id',requireAuth,requireAdmin,async(req,res)=>{
+    const trial = (await trials.list(validId(req.params.id)))[0];
+    if (!trial) return res.status(404).json({error:'Solicitação não encontrada'});
+    res.json({trial});
+  });
+  router.post(['/admin/testes-premium/:id/:action','/api/admin/testes-premium/:id/:action'],requireAuth,requireAdmin,async(req,res)=>{
+    if (!['aprovar','recusar'].includes(req.params.action)) return res.status(422).json({error:'Ação inválida'});
+    await trials.decide(validId(req.params.id),req.user,req.params.action==='aprovar');
+    if(req.path.startsWith('/api/')) return res.json({ok:true});
+    res.redirect(303,'/admin/testes-premium');
+  });
+  router.get('/conta/seguranca',requireAuth,(req,res)=>res.render('account/security',{title:'Segurança'}));
   router.use(opportunityRoutes(database));
   router.get('/', (req, res) => res.redirect(req.user ? (req.user.tipo === 'admin' ? '/admin' : '/conta') : '/login'));
   router.get('/login', controller.loginPage);

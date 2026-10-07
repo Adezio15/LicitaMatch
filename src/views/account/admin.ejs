@@ -75,8 +75,8 @@
                   <td><span class="badge"><%= empresa.status %></span></td>
                   <td><form method="post" action="/admin/empresas/<%= empresa.id %>/plano" class="stack">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <label>Plano de <%= empresa.razao_social %><select name="plano">
-                    <% for (const [value,label] of Object.entries({ start: 'Start', pro: 'Pro', premium: 'Premium' })) { %>
+                    <% if(empresa.plano==='premium_teste') { %><p class="badge">Premium - Teste</p><% } %><label>Plano de <%= empresa.razao_social %><select name="plano">
+                    <% for (const [value,label] of Object.entries({ sem_plano:'Sem plano', start: 'Start', pro: 'Pro', premium: 'Premium' })) { %>
                       <option value="<%= value %>" <%= empresa.plano === value ? 'selected' : '' %>><%= label %></option>
                     <% } %></select></label><button class="button small">Salvar plano</button>
                   </form></td>

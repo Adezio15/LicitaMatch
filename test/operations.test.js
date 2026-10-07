@@ -74,8 +74,12 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     for (const path of ['/conta','/interesses','/oportunidades','/empresa','/usuarios']) {
       const page = await a.get(path).expect(200);
       assert.equal((page.text.match(/class="sidebar"/g) || []).length, 1);
-      assert.match(page.text, new RegExp('href="' + path + '" aria-current="page"'));
+      if (path !== '/usuarios') assert.match(page.text, new RegExp('href="' + path + '" aria-current="page"'));
+      else assert.doesNotMatch(page.text, /class="nav-link[^"]*" href="\/usuarios"/);
     }
+    const securityPage = await a.get('/conta/seguranca').expect(200);
+    assert.match(securityPage.text, /Salvar nova senha/);
+    assert.match(securityPage.text, /href="\/usuarios"/);
     await a.get('/admin/operacao').expect(403);
     await a.post('/admin/operacao/email-teste').set('X-CSRF-Token',first.csrfToken).send({email:'test@example.test'}).expect(403);
     await a.post('/api/conta/alertas').set('X-CSRF-Token',first.csrfToken).send({alertas_email:true}).expect(200);
