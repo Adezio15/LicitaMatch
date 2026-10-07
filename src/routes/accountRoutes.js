@@ -84,6 +84,10 @@ export function accountRoutes(database, config, logger) {
   };
   router.post('/admin/empresas/:id/plano', requireAuth, requireAdmin, changePlan);
   router.patch('/api/admin/empresas/:id/plano', requireAuth, requireAdmin, changePlan);
+  router.post('/admin/empresas/:id/excluir', requireAuth, requireAdmin, async (req, res) => {
+    await service.deleteCompany(req.user, validId(req.params.id));
+    res.redirect(303, '/admin');
+  });
   router.get('/api/admin/empresas', requireAuth, requireAdmin, controller.adminEmpresas);
   router.get('/conta', requireAuth, controller.accountPage);
   router.post(['/conta/senha', '/api/auth/password'], requireAuth, loginLimit, controller.changePassword);

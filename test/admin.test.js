@@ -58,12 +58,37 @@ test('admin global acessa painel geral e gestores comuns não acessam', async ()
   const adminPage = await adminAgent.get('/admin').expect(200);
   assert.match(adminPage.text, /Painel administrativo/i);
   assert.match(adminPage.text, /Empresa Administrativa LTDA/i);
+  assert.equal((adminPage.text.match(/<aside\b/g) || []).length, 1);
+  assert.equal((adminPage.text.match(/class="dashboard-shell"/g) || []).length, 1);
+  assert.match(adminPage.text, /Excluir empresa/);
 
   const dashboardPage = await adminAgent.get('/conta').expect(200);
+  assert.match(dashboardPage.text, /class="grid dashboard-panels"/);
   assert.match(dashboardPage.text, /Receber no meu e-mail/i);
   assert.match(dashboardPage.text, /Receber no WhatsApp/i);
 
   await gestorAgent.get('/admin').expect(403);
   await gestorAgent.get('/api/admin/empresas').expect(403);
   await adminAgent.get('/api/admin/empresas').expect(200);
+  const deletionPath = `/admin/empresas/${gestorCompany.id}/excluir`;
+  await request(app).post(deletionPath).expect(403);
+  await gestorAgent.post(deletionPath).set('X-CSRF-Token',gestorLogin.body.csrfToken).expect(403);
+  await adminAgent.post(deletionPath).expect(403);
+  await adminAgent.post(`/admin/empresas/${adminCompany.id}/excluir`).set('X-CSRF-Token',adminLogin.body.csrfToken).expect(409);
+  const member = (await db.query('SELECT id FROM usuarios WHERE empresa_id=$1',[gestorCompany.id])).rows[0];
+  await db.query("INSERT INTO testes_premium (empresa_id,cnpj,usuario_id,status) VALUES ($1,$2,$3,'recusado')",[gestorCompany.id,gestorCompany.cnpj,member.id]);
+  const deleted = await adminAgent.post(deletionPath).set('X-CSRF-Token',adminLogin.body.csrfToken).expect(303);
+  assert.equal(deleted.headers.location,'/admin');
+  const company = (await db.query('SELECT status,excluida_em FROM empresas WHERE id=$1',[gestorCompany.id])).rows[0];
+  assert.equal(company.status,'inativo');
+  assert.ok(company.excluida_em);
+  assert.equal((await db.query('SELECT count(*)::int AS total FROM testes_premium WHERE empresa_id=$1',[gestorCompany.id])).rows[0].total,1);
+  const listing = await adminAgent.get('/api/admin/empresas').expect(200);
+  assert.equal(listing.body.empresas.length,1);
+  assert.equal(listing.body.summary.empresas_totais,1);
+  await gestorAgent.get('/api/auth/me').expect(401);
+  await adminAgent.post(deletionPath).set('X-CSRF-Token',adminLogin.body.csrfToken).expect(404);
+  await adminAgent.get('/admin').expect(200);
+  app.locals.sessionStore.close();
+  await db.close();
 });

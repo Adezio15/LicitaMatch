@@ -66,12 +66,18 @@ export function accountRepository(database) {
       const { rows } = await database.query(`SELECT ${publicUserColumns} FROM usuarios WHERE empresa_id=$1 ORDER BY nome, id LIMIT 200`, [empresaId]);
       return rows;
     },
+    async deleteCompany(id) {
+      const { rows } = await database.query(`UPDATE empresas SET status='inativo', excluida_em=now()
+        WHERE id=$1 AND excluida_em IS NULL RETURNING id`, [id]);
+      if (!rows[0]) throw new HttpError(404, 'Empresa não encontrada');
+      return rows[0];
+    },
     async listCompanies() {
       const { rows } = await database.query(`SELECT e.*,
         (SELECT count(*)::int FROM usuarios u WHERE u.empresa_id=e.id AND u.ativo=true) AS usuarios_ativos,
         (SELECT count(*)::int FROM interesses i WHERE i.empresa_id=e.id AND i.ativo=true) AS interesses_ativos,
         (SELECT count(*)::int FROM matches m JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE m.empresa_id=e.id AND licitacao_permitida(l.modalidade,l.uf)) AS oportunidades_totais
-        FROM empresas e
+        FROM empresas e WHERE e.excluida_em IS NULL
         ORDER BY e.created_at DESC`);
       return rows;
     },
@@ -79,9 +85,9 @@ export function accountRepository(database) {
       const { rows: summaryRows } = await database.query(`SELECT
         count(*)::int AS empresas_totais,
         count(*) FILTER (WHERE status = 'ativo')::int AS empresas_ativas,
-        (SELECT count(*)::int FROM usuarios WHERE ativo=true) AS usuarios_ativos,
-        (SELECT count(*)::int FROM interesses WHERE ativo=true) AS interesses_ativos
-        FROM empresas`);
+        (SELECT count(*)::int FROM usuarios u JOIN empresas e ON e.id=u.empresa_id WHERE u.ativo=true AND e.excluida_em IS NULL) AS usuarios_ativos,
+        (SELECT count(*)::int FROM interesses i JOIN empresas e ON e.id=i.empresa_id WHERE i.ativo=true AND e.excluida_em IS NULL) AS interesses_ativos
+        FROM empresas WHERE excluida_em IS NULL`);
       const empresas = await this.listCompanies();
       return { summary: summaryRows[0] || {}, empresas };
     },

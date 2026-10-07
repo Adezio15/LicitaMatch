@@ -32,3 +32,5 @@ dialog{width:min(960px,94vw);max-height:90dvh;overflow:auto;border:1px solid var
   .report-page thead { display: table-header-group; }
   .report-page tr { break-inside: avoid; }
 }
+
+.button.danger{background:#a52a35;color:white}.button.danger:hover{background:#84222a}

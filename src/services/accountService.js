@@ -57,6 +57,11 @@ export function accountService(database) {
         return transaction.changePlan(empresaId, plano);
       });
     },
+    async deleteCompany(actor, id) {
+      if (actor.tipo !== 'admin') throw new HttpError(403, 'Acesso reservado ao administrador');
+      if (String(actor.empresa_id) === String(id)) throw new HttpError(409, 'Não é possível excluir sua própria empresa.');
+      return repository.deleteCompany(id);
+    },
     async getAdminOverview() {
       return repository.getAdminOverview();
     },

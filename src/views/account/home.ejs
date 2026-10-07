@@ -40,7 +40,7 @@
     <button class="button" data-open-plans>Conhecer os planos</button></section>
     <section class="panel section-gap"><h2>Ações rápidas</h2><div class="quick-actions">
     <% for (const [href,label] of [['/interesses','◎ Áreas de interesse'],['/oportunidades','↗ Oportunidades'],['/empresa','▣ Minha empresa'],['/conta/seguranca','◇ Segurança']]) { %><a class="button secondary" href="<%= href %>"><%= label %></a><% } %><button class="button secondary" data-open-plans>✦ Plano e assinatura</button></div></section>
-    <div class="grid two dashboard-panels">
+    <div class="grid dashboard-panels">
       <section class="panel">
         <% if (user.plano === 'sem_plano') { %><h2>Encontramos oportunidades para sua empresa.</h2><p>Encontramos <strong><%= dashboard.oportunidades_totais %></strong> oportunidades compatíveis com o perfil da sua empresa.</p><button class="button" data-open-plans>Desbloquear oportunidades</button><% } else if (user.plano === 'start') { %><p>Consulte a <a href="/busca">busca por segmento</a>. Match de compatibilidade exige upgrade para Pro ou Premium.</p><% } else { %>
         <h2>Oportunidades prioritárias</h2><p><a href="/oportunidades">Ver todas as oportunidades</a></p>
