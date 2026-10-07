@@ -14,9 +14,9 @@
   <% for (const item of items) { %>
     <article class="panel section-gap"><div class="panel-header"><strong><%= item.score %>% de correlação</strong><span class="badge"><%= labels[item.status] %></span></div>
       <h2><%= item.objeto %></h2><p><strong><%= item.unidade_gestora %></strong> · <%= item.modalidade %> · <%= item.uf || 'UF não informada' %></p>
-      <p>Interesse: <%= item.interesse_titulo %> · Fonte: <%= item.origem %></p>
+      <p>Interesse: <%= item.interesse_titulo %> · Fonte: <%= { pncp: 'PNCP', comprasnet: 'Compras.gov.br' }[item.origem] || item.origem %></p>
       <p>Data informada pela fonte: <%= new Date(item.data_abertura).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) %></p>
-      <% const pncpId = /^(\d{14})-1-(\d+)-(\d{4})$/.exec(item.codigo_externo); if (pncpId) { %><p><a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/editais/<%= pncpId[1] %>/<%= pncpId[3] %>/<%= Number(pncpId[2]) %>">Consultar edital no PNCP</a></p><% } %>
+      <%- include('../partials/officialLink', { item }) %>
       <% if (['gestor','admin'].includes(user.tipo)) { %><form method="post" action="/oportunidades/<%= item.match_id %>" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>"><label>Situação<select name="status"><% for (const [value,label] of Object.entries(labels)) { %><option value="<%= value %>" <%= item.status===value ? 'selected' : '' %>><%= label %></option><% } %></select></label><button type="submit" class="button secondary">Atualizar situação</button>
       </form><% } %>

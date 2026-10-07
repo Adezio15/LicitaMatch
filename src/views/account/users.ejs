@@ -6,7 +6,7 @@
   <section class="panel table-scroll"><table><caption>Equipe cadastrada (até 200 usuários)</caption><thead><tr><th>Nome</th><th>E-mail</th><th>Permissão</th><th>Status</th><th>Ação</th></tr></thead><tbody>
     <% for (const member of users) { %><tr><td><%= member.nome %></td><td><%= member.email %></td><td><%= member.tipo %></td><td><span class="badge"><%= member.ativo ? 'Ativo' : 'Inativo' %></span></td><td><% if (String(member.id) !== String(user.id) && member.tipo !== 'admin') { %><a href="/usuarios/<%= member.id %>">Editar</a><% } else { %>—<% } %></td></tr><% } %>
   </tbody></table></section>
-  <section class="panel section-gap"><h2>Adicionar usuário</h2>
+  <section class="panel section-gap"><h2>Adicionar usuário</h2><p>Plano <%= planCatalog[user.plano]?.name %>: até <strong><%= planCatalog[user.plano]?.users %> usuário(s) ativo(s)</strong>, incluindo o gestor. Atualmente: <%= users.filter(member => member.ativo).length %> ativo(s).</p><p class="muted">Start: 1 usuário · Pro: 3 usuários · Premium: 10 usuários.</p>
     <form method="post" action="/usuarios" class="stack">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="grid two">

@@ -1,9 +1,19 @@
 <%- include('../partials/head') %>
 <%- include('../partials/nav') %>
-<main class="page"><h1>Relatório de oportunidades</h1><p>Resumo dos matches dos interesses ativos da sua empresa.</p>
-<section class="panel"><table><thead><tr><th>Situação</th><th>Matches</th><th>Compatibilidade média</th></tr></thead><tbody>
-<% const labels = { novo: 'Nova', revisado: 'Revisada', aceito: 'Aceita', recusado: 'Recusada' }; %>
-<% for (const item of items) { %><tr><td><%= labels[item.status] %></td><td><%= item.total %></td><td><%= item.score_medio %>%</td></tr><% } %>
-</tbody></table><% if (!items.length) { %><p>Nenhum match disponível para o relatório.</p><% } %></section>
+<main class="page report-page">
+  <header class="page-heading panel-header"><div><h1>Relatório de oportunidades</h1><p><%= user.nome_fantasia || user.razao_social %></p></div><button class="button report-export" id="export-report" type="button">Exportar em PDF</button></header>
+  <p>Gerado em <%= new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %> (Brasília). Resumo dos matches dos interesses ativos da sua empresa.</p>
+  <p class="muted report-export">Para exportar, selecione “Salvar como PDF” na janela de impressão.</p>
+  <% const total = items.reduce((sum, item) => sum + Number(item.total), 0); const average = total ? Math.round(items.reduce((sum, item) => sum + Number(item.total) * Number(item.score_medio), 0) / total) : null; %>
+  <section class="stats-grid" aria-label="Resumo do relatório">
+    <article class="stat-card"><span class="stat-label">Matches</span><strong><%= total %></strong></article>
+    <article class="stat-card"><span class="stat-label">Compatibilidade média aproximada</span><strong><%= average === null ? '—' : average + '%' %></strong></article>
+    <article class="stat-card"><span class="stat-label">Aceitos</span><strong><%= items.find(item => item.status === 'aceito')?.total || 0 %></strong></article>
+  </section>
+  <section class="panel section-gap table-scroll"><table><caption>Distribuição por situação</caption><thead><tr><th>Situação</th><th>Matches</th><th>Participação</th><th>Compatibilidade média</th></tr></thead><tbody>
+  <% const labels = { novo: 'Nova', revisado: 'Revisada', aceito: 'Aceita', recusado: 'Recusada' }; %>
+  <% for (const item of items) { %><tr><td><%= labels[item.status] || item.status %></td><td><%= item.total %></td><td><%= total ? (Number(item.total) / total * 100).toFixed(1) : '0' %>%</td><td><%= item.score_medio %>%</td></tr><% } %>
+  </tbody></table><% if (!items.length) { %><p>Nenhum match disponível para o relatório.</p><% } %></section>
 </main></div>
+<script src="/assets/reports.js" defer></script>
 <%- include('../partials/footer') %>

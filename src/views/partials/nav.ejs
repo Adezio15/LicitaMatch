@@ -4,9 +4,10 @@
     <nav class="sidebar-nav" aria-label="Navegação principal">
       <% const links = [['/busca','Busca por segmento'],['/relatorios','Relatórios'],['/conta','▦ Dashboard'],['/interesses','Interesses'],['/oportunidades','Oportunidades'],['/empresa','Empresa']];
 
+      if (['gestor', 'admin'].includes(user.tipo)) links.push(['/usuarios','Usuários']);
       if (user.tipo === 'admin') links.push(['/admin','Admin'],['/admin/operacao','Operação e fontes'],['/admin/testes-premium','Testes Premium']);
       for (const [href,label] of links) {
-        const active = currentPath === href || (href === '/conta' && (currentPath === '/conta/seguranca' || currentPath.startsWith('/usuarios'))); %>
+        const active = currentPath === href || (href === '/usuarios' && currentPath.startsWith('/usuarios/')) || (href === '/conta' && currentPath === '/conta/seguranca'); %>
         <a class="nav-link<%= active ? ' active' : '' %>" href="<%= href %>" <% if (active) { %>aria-current="page"<% } %>><%= label %></a>
       <% } %>
       <a class="nav-link" href="/conta#alertas">Alertas</a>

@@ -1,3 +1,4 @@
+import { validOfficialUrl } from './sources/officialUrl.js';
 import { createHash } from 'node:crypto';
 import { normalizeItemSignature } from './deduplicationService.js';
 import { normalizeUf } from './sources/procurementMetadata.js';
@@ -7,18 +8,19 @@ export function pncpRepository(database) {
     async save(item) {
       // Reimports enrich old records; do not discard their newly available UF.
       const updated = await database.query(`UPDATE licitacoes_pncp SET uf=COALESCE($2,uf),
-        modalidade=CASE WHEN $3='N/D' THEN modalidade ELSE $3 END
-        WHERE codigo_externo=$1 RETURNING id`, [item.id, normalizeUf(item.uf), item.modalidade || 'N/D']);
+        modalidade=CASE WHEN $3='N/D' THEN modalidade ELSE $3 END,
+        link_edital=COALESCE($4,link_edital)
+        WHERE codigo_externo=$1 RETURNING id`, [item.id, normalizeUf(item.uf), item.modalidade || 'N/D', validOfficialUrl(item.link_edital)]);
       if (updated.rows.length) return null;
-      const { rows } = await database.query(`INSERT INTO licitacoes_pncp (codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem, assinatura, uf)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      const { rows } = await database.query(`INSERT INTO licitacoes_pncp (codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem, assinatura, uf, link_edital)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         ON CONFLICT DO NOTHING
-        RETURNING id, codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem`,
-      [item.id, item.objeto, new Date(item.dataAbertura).toISOString(), item.unidadeGestora, item.modalidade || 'N/D', item.origem || 'pncp', createHash('sha256').update(normalizeItemSignature(item)).digest('hex'), normalizeUf(item.uf)]);
+        RETURNING id, codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem, link_edital`,
+      [item.id, item.objeto, new Date(item.dataAbertura).toISOString(), item.unidadeGestora, item.modalidade || 'N/D', item.origem || 'pncp', createHash('sha256').update(normalizeItemSignature(item)).digest('hex'), normalizeUf(item.uf), validOfficialUrl(item.link_edital)]);
       return rows[0] || null;
     },
     async listLatest(limit = 200) {
-      const { rows } = await database.query(`SELECT id, codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem, uf
+      const { rows } = await database.query(`SELECT id, codigo_externo, objeto, data_abertura, unidade_gestora, modalidade, origem, uf, link_edital
         FROM licitacoes_pncp ORDER BY data_abertura DESC, id DESC LIMIT $1`, [limit]);
       return rows;
     }
@@ -34,6 +36,7 @@ export async function persistPncpItems(database, items = [], origem = 'pncp') {
     if (!item || !item.id || !item.objeto || !item.dataAbertura || !item.unidadeGestora) continue;
     const normalized = {
       origem,
+      link_edital: validOfficialUrl(item.link_edital),
       uf: normalizeUf(item.uf),
       id: String(item.id).trim(),
       objeto: String(item.objeto).trim(),

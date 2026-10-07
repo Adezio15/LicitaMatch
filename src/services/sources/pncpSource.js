@@ -1,3 +1,4 @@
+import { officialUrlFromRecord } from './officialUrl.js';
 import { fetchJson, queryWindow, unitName } from './httpSource.js';
 import { normalizeUf, pncpModalidade } from './procurementMetadata.js';
 const DEFAULT_PNCP_URL = 'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao';
@@ -12,7 +13,8 @@ export function normalizePncpItems(payload) {
     const modalidade = pncpModalidade(item?.modalidadeId, item?.modalidadeNome || item?.modalidade);
     const uf = normalizeUf(item?.unidadeOrgao?.ufSigla || item?.uf);
     if (!id || !objeto || !unidadeGestora || !dataAbertura || Number.isNaN(Date.parse(dataAbertura))) return null;
-    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(uf ? { uf } : {}) };
+    const link = officialUrlFromRecord(item);
+    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(link ? { link_edital: link } : {}), ...(uf ? { uf } : {}) };
   }).filter(Boolean);
 }
 

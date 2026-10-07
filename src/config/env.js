@@ -61,6 +61,7 @@ const schema = z.object({
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.0$/).optional(),
   WHATSAPP_TEMPLATE_NAME: z.string().regex(/^[a-z0-9_]+$/).optional(),
   WHATSAPP_TEMPLATE_LANGUAGE: z.string().regex(/^[a-z]{2}(?:_[A-Z]{2})?$/).default('pt_BR'),
+  ADMIN_EMAIL: z.preprocess(value => typeof value === 'string' && !value.trim() ? undefined : value, z.string().trim().email().optional()),
   EMAIL_FROM: z.string().email().optional(),
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),

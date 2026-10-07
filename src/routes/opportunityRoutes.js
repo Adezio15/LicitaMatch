@@ -52,7 +52,10 @@ export function opportunityRoutes(database) {
     res.render('account/opportunities', { title: 'Oportunidades', ...data });
   });
   router.get(['/oportunidades/:id','/api/oportunidades/:id'],requireAuth,async(req,res)=>{
-    if(req.user.plano==='sem_plano') return res.status(403).json({error:'Assinatura necessária'});
+    if(req.user.plano==='sem_plano') {
+      res.locals.authorizationReason = 'Assinatura necessária';
+      return res.status(403).json({error:'Assinatura necessária'});
+    }
     const item = await service.detail(req.user.empresa_id,validId(req.params.id));
     if (req.path.startsWith('/api/')) return res.json({item});
     res.render('account/opportunity',{title:'Oportunidade',item});

@@ -21,3 +21,14 @@ dialog{width:min(960px,94vw);max-height:90dvh;overflow:auto;border:1px solid var
 .dashboard-panels{grid-template-columns:minmax(0,1fr)}
 @media(max-width:900px){.dashboard-page .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.dashboard-page .stats-grid{grid-template-columns:1fr}.quick-actions>.button{width:100%}}
+@media print {
+  @page { size: A4; margin: 15mm; }
+  body { background: white; color: black; }
+  .sidebar, .footer, dialog, .report-export { display: none !important; }
+  .dashboard-shell { display: block; margin: 0; padding: 0; max-width: none; }
+  .report-page .stats-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .report-page .panel, .report-page .stat-card { box-shadow: none; break-inside: avoid; }
+  .report-page .table-scroll { overflow: visible; }
+  .report-page thead { display: table-header-group; }
+  .report-page tr { break-inside: avoid; }
+}

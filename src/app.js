@@ -21,7 +21,7 @@ export function createApp({ config, database, logger, operationsDatabase = datab
   app.use((req, res, next) => {
     req.id = randomUUID();
     res.setHeader('X-Request-Id', req.id);
-    res.on('finish', () => logger.info({ requestId: req.id, method: req.method, status: res.statusCode }, 'Requisição concluída'));
+    res.on('finish', () => logger.info({ requestId: req.id, method: req.method, path: req.path, status: res.statusCode, usuarioId: req.user?.id, empresaId: req.user?.empresa_id, perfil: req.user?.tipo, plano: req.user?.plano, authorizationReason: res.locals.authorizationReason }, 'Requisição concluída'));
     next();
   });
   app.use(rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false,

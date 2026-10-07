@@ -9,7 +9,7 @@ export function premiumTrialService(database, config, logger, deliverEmail = sen
     finally { client.release(); }
   }
   async function notify(client, subject, body, to) {
-    const recipients = to ? [to] : (await client.query("SELECT email FROM usuarios WHERE tipo='admin' AND ativo=true")).rows.map(r => r.email);
+    const recipients = to ? [to] : config.ADMIN_EMAIL ? [config.ADMIN_EMAIL] : (await client.query("SELECT email FROM usuarios WHERE tipo='admin' AND ativo=true")).rows.map(r => r.email);
     for (const recipient of new Set(recipients)) await client.query('INSERT INTO notificacoes_plano (destinatario,assunto,corpo) VALUES ($1,$2,$3)', [recipient,subject,body]);
   }
   const formatDate = value => new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) + ' (Brasília)';

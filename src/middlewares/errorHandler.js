@@ -8,7 +8,9 @@ export function errorHandler(logger) {
         [400, 413, 415].includes(error.status) ? error.status : 500);
     const message = error.code === '23505' ? 'Não foi possível salvar. Verifique se o e-mail ou CNPJ já está cadastrado.' :
       error instanceof HttpError ? error.message : status === 500 ? 'Erro interno do servidor' : 'Requisição inválida';
-    logger[status >= 500 ? 'error' : 'warn']({ requestId: req.id, status, code: error.code }, 'Falha na requisição');
+    logger[status >= 500 ? 'error' : 'warn']({ requestId: req.id, status, code: error.code, method: req.method, path: req.path,
+      usuarioId: req.user?.id, empresaId: req.user?.empresa_id, perfil: req.user?.tipo, plano: req.user?.plano,
+      ...(status === 403 && error instanceof HttpError ? { authorizationReason: error.message } : {}) }, 'Falha na requisição');
     if (!req.path.startsWith('/api/') && req.accepts(['json', 'html']) === 'html') {
       return res.status(status).render('error', { title: 'Não foi possível concluir', message, status });
     }

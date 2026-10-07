@@ -70,3 +70,13 @@ Inclui verificação de expiração no milissegundo exato, manutenção dos trê
 - Testes: `test/premiumTrials.test.js`, `test/operations.test.js`.
 
 O projeto mantém Express/EJS, PostgreSQL, autenticação por sessão, papéis usuário/gestor/admin e o transporte de e-mail existente em `emailDiagnostics.js`. A gestão de senha e permissões passou para Segurança; os endpoints anteriores continuam disponíveis. Não havia catálogo de preços nem gateway: os botões de contratação geram contato administrativo e não concedem acesso. O administrador atribui o plano pelo controle existente.
+
+### Destinatário administrativo
+
+Configure `ADMIN_EMAIL` no ambiente do serviço (por exemplo, nas variáveis do Railway) com o endereço administrativo real. Valores inválidos impedem a inicialização; valores vazios usam os administradores ativos cadastrados, preservando o comportamento anterior. A configuração tem prioridade para novas notificações administrativas de solicitação, contratação e tentativa de reutilização. Aprovações/recusas continuam sendo enviadas ao solicitante. Notificações já enfileiradas preservam seu destinatário, e e-mails já aceitos pelo provedor não são reenviados automaticamente.
+
+### Diagnóstico HTTP 403
+
+Os eventos de conclusão registram `path` (sem query string), método, status, `requestId`, `usuarioId`, `empresaId`, `perfil` e plano efetivo. Erros 403 tratados também registram `authorizationReason` com a mensagem da regra. Correlacione os eventos pelo `requestId`. Um bloqueio de recurso por plano é esperado quando o plano efetivo não inclui o recurso; bloqueios de perfil, CSRF ou reutilização de teste têm causas distintas e não devem ser atribuídos automaticamente aos planos. Os logs antigos não continham contexto suficiente para essa identificação.
+
+Relatórios continuam exclusivos do Premium. O botão “Exportar em PDF” abre a impressão do navegador, onde o usuário seleciona “Salvar como PDF”; o documento omite menu, botão e rodapé.

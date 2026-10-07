@@ -1,3 +1,4 @@
+import { officialUrlFromRecord } from './officialUrl.js';
 import { fetchJson, queryWindow, unitName } from './httpSource.js';
 import { scrapeComprasnetFallback } from './webScraper.js';
 import { normalizeUf, pncpModalidade } from './procurementMetadata.js';
@@ -15,7 +16,8 @@ export function normalizeComprasnetItems(payload) {
     const modalidade = pncpModalidade(item?.modalidadeIdPncp, item?.modalidadeNome || item?.modalidade || item?.tipo);
     const uf = normalizeUf(item?.unidadeOrgaoUfSigla || item?.unidadeOrgao?.ufSigla || item?.uf);
     if (!id || !objeto || !unidadeGestora || !dataAbertura || Number.isNaN(Date.parse(dataAbertura))) return null;
-    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(uf ? { uf } : {}) };
+    const link = officialUrlFromRecord(item);
+    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(link ? { link_edital: link } : {}), ...(uf ? { uf } : {}) };
   }).filter(Boolean);
 }
 

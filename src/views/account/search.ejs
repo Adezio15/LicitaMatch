@@ -12,8 +12,8 @@
   </form>
   <p><%= total %> resultado(s)</p>
   <% for (const item of items) { %>
-    <article class="panel section-gap"><h2><%= item.objeto %></h2><p><%= item.unidade_gestora %> · <%= item.modalidade %> · <%= item.uf %></p><p>Fonte: <%= item.origem %></p>
-    <% const pncpId = /^(\d{14})-1-(\d+)-(\d{4})$/.exec(item.codigo_externo); if (pncpId) { %><a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/editais/<%= pncpId[1] %>/<%= pncpId[3] %>/<%= Number(pncpId[2]) %>">Consultar edital no PNCP</a><% } %>
+    <article class="panel section-gap"><h2><%= item.objeto %></h2><p><%= item.unidade_gestora %> · <%= item.modalidade %> · <%= item.uf %></p><p>Fonte: <%= { pncp: 'PNCP', comprasnet: 'Compras.gov.br' }[item.origem] || item.origem %></p>
+      <%- include('../partials/officialLink', { item }) %>
     </article>
   <% } %>
   <% if (!items.length) { %><p>Nenhuma oportunidade encontrada. Revise os interesses e filtros.</p><% } %>
