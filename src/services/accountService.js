@@ -1,3 +1,4 @@
+import { companyProfileService } from './companyProfileService.js';
 import { companyPlan, plans } from './planService.js';
 import { opportunityService } from './opportunityService.js';
 import bcrypt from 'bcrypt';
@@ -14,6 +15,7 @@ export function accountService(database) {
   const repository = accountRepository(database);
   return {
     repository,
+    profile: companyProfileService(database),
     async register(data) {
       const hash = await hashPassword(data.senha);
       return repository.transaction(async transaction => {

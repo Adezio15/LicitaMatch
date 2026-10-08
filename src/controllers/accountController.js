@@ -1,3 +1,4 @@
+import { profileSections } from '../utils/companyProfileFields.js';
 import { randomBytes } from 'node:crypto';
 import { SESSION_COOKIE, SESSION_LIFETIME_MS, REMEMBER_LIFETIME_MS, cookieOptions } from '../config/session.js';
 import { validate, registerSchema, loginSchema, companySchema, userCreateSchema, userUpdateSchema, changePasswordSchema, validId, states } from '../utils/validation.js';
@@ -53,7 +54,8 @@ export function accountController(service, config) {
     me(req, res) { res.json({ user: safeUser(req.user) }); },
     async accountPage(req, res) {
       const dashboard = await service.getDashboard(req.user.empresa_id);
-      res.render('account/home', { title: 'Dashboard', dashboard, emailEnabled: config.EMAIL_ENABLED === 'true', whatsappEnabled: config.WHATSAPP_ENABLED === 'true', alertsSaved: req.query.alertas === 'salvos' });
+      const { completion } = await service.profile.get(req.user.empresa_id);
+      res.render('account/home', { title: 'Dashboard', dashboard, completion, emailEnabled: config.EMAIL_ENABLED === 'true', whatsappEnabled: config.WHATSAPP_ENABLED === 'true', alertsSaved: req.query.alertas === 'salvos' });
     },
     async adminDashboard(req, res) {
       const data = await service.getAdminOverview();
@@ -65,9 +67,9 @@ export function accountController(service, config) {
       res.render('account/admin', { title: 'Painel administrativo', data });
     },
     async company(req, res) {
-      const company = await service.repository.getCompany(req.user.empresa_id);
-      if (isApi(req)) return res.json({ company });
-      res.render('account/company', { title: 'Empresa', company, states, saved: req.query.salvo === '1' });
+      const result = await service.profile.get(req.user.empresa_id);
+      if (isApi(req)) return res.json(result);
+      res.render('account/company', { title: 'Perfil Empresarial', ...result, sections: profileSections, states, saved: req.query.salvo === '1', adminCompanyId: null });
     },
     async updateCompany(req, res) {
       const company = await service.repository.updateCompany(req.user.empresa_id, validate(companySchema, req.body));

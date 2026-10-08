@@ -1,6 +1,8 @@
 import { readMigrations } from './migrationService.js';
 
-export const requiredTables = ['schema_migrations', 'empresas', 'usuarios', 'sessoes', 'licitacoes_pncp', 'interesses', 'matches', 'tarefas', 'alertas'];
+export const requiredTables = ['schema_migrations', 'empresas', 'usuarios', 'sessoes', 'licitacoes_pncp', 'interesses', 'matches', 'tarefas', 'alertas',
+  'empresa_perfil', 'empresa_atividades', 'empresa_produtos_servicos', 'empresa_marcas',
+  'empresa_regioes', 'empresa_documentos', 'empresa_certificacoes', 'empresa_restricoes'];
 
 // Only SELECTs: this check never applies migrations or modifies application data.
 export async function inspectDatabase(database) {

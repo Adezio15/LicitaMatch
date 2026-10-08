@@ -65,7 +65,7 @@
                   <td><%= empresa.usuarios_ativos ?? 0 %></td>
                   <td><%= empresa.interesses_ativos ?? 0 %></td>
                   <td><%= empresa.oportunidades_totais ?? 0 %></td>
-                  <td><% if (String(empresa.id) !== String(user.empresa_id)) { %>
+                  <td><a class="button secondary small" href="/admin/empresas/<%= empresa.id %>/perfil">Ver perfil</a><% if (String(empresa.id) !== String(user.empresa_id)) { %>
                     <form method="post" action="/admin/empresas/<%= empresa.id %>/excluir" data-delete-company data-company-name="<%= empresa.razao_social %>">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                       <button type="submit" class="button small danger">Excluir empresa</button>

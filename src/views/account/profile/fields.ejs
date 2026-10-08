@@ -1,0 +1,25 @@
+<% for (const field of fields) { const value = values[field.name] ?? ''; %>
+  <% if (field.type === 'tags') { %>
+  <div class="tag-field" data-field="<%= field.name %>" data-type="tags">
+    <label><%= field.label %><input type="text" maxlength="100" placeholder="Digite e pressione Enter" data-tag-input></label>
+    <div class="tag-list" aria-label="<%= field.label %>"><% for (const tag of (value || [])) { %><span class="profile-tag"><span data-tag-value><%= tag %></span><button type="button" data-remove-tag aria-label="Remover <%= tag %>">×</button></span><% } %></div>
+    <button type="button" class="button secondary small" data-add-tag>+ Adicionar palavra</button>
+  </div>
+  <% } else { %>
+  <label class="<%= field.type === 'checkbox' ? 'checkbox' : '' %>">
+    <%= field.label %>
+    <% if (field.type === 'textarea') { %>
+      <textarea data-field="<%= field.name %>" maxlength="<%= field.max || 200 %>" rows="3" <%= field.required ? 'required' : '' %>><%= value %></textarea>
+    <% } else if (field.type === 'select') { %>
+      <% if (field.name === 'estado' && groupName === 'regioes') { %><input type="search" placeholder="Pesquisar estado por nome ou UF" data-state-search aria-label="Pesquisar estado"><% } %>
+      <select data-field="<%= field.name %>"><% for (const [key,label] of field.options) { %><option value="<%= key %>" <%= value === key ? 'selected' : '' %>><%= label %></option><% } %></select>
+    <% } else { %>
+      <input data-field="<%= field.name %>" type="<%= field.type %>" <% if (field.type === 'checkbox') { %><%= value === true ? 'checked' : '' %><% } else { %>value="<%= value %>"<% } %>
+      <% if (field.type !== 'number') { %>maxlength="<%= field.max || 200 %>"<% } %>
+      <% if (field.min !== undefined) { %>min="<%= field.min %>"<% } %><% if (field.maxValue !== undefined) { %>max="<%= field.maxValue %>"<% } %>
+      <% if (field.step) { %>step="<%= field.step %>"<% } %><% if (field.list) { %>list="<%= field.list %>"<% } %><% if (field.mask) { %>data-mask="<%= field.mask %>"<% } %> <%= field.required ? 'required' : '' %>>
+    <% } %>
+    <% if (field.help) { %><small class="muted"><%= field.help %></small><% } %>
+  </label>
+  <% } %>
+<% } %>

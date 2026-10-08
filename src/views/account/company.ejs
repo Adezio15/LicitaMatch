@@ -1,23 +1,38 @@
 <%- include('../partials/head') %>
 <%- include('../partials/nav') %>
-<main class="page narrow">
-  <header class="page-heading"><span class="eyebrow">DADOS CADASTRAIS</span><h1>Sua empresa</h1><p class="muted">CNPJ: <%= company.cnpj %> · Plano: <%= { start: 'Start', pro: 'Pro', premium: 'Premium' }[company.plano] %> · Status: <%= company.status %></p></header>
-  <% if (saved) { %><p class="notice" role="status">Dados da empresa atualizados.</p><% } %>
-  <form method="post" action="/empresa" class="panel stack">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <fieldset <%= ['gestor', 'admin'].includes(user.tipo) ? '' : 'disabled' %>>
-      <legend>Informações da empresa</legend>
-      <div class="grid two">
-        <label>Razão social<input name="razao_social" value="<%= company.razao_social %>" maxlength="200" required></label>
-        <label>Nome fantasia<input name="nome_fantasia" value="<%= company.nome_fantasia || '' %>" maxlength="200"></label>
-        <label>E-mail<input name="email_empresa" type="email" value="<%= company.email %>" maxlength="254" required></label>
-        <label>Telefone<input name="telefone" value="<%= company.telefone || '' %>" maxlength="30"></label>
-        <label>Cidade<input name="cidade" value="<%= company.cidade || '' %>" maxlength="100"></label>
-        <label>Estado<select name="estado"><option value="">Selecione</option><% for (const state of states) { %><option <%= company.estado === state ? 'selected' : '' %>><%= state %></option><% } %></select></label>
-      </div>
-    </fieldset>
-    <% if (['gestor', 'admin'].includes(user.tipo)) { %><button class="button" type="submit">Salvar alterações</button><% } else { %><p class="muted">Apenas gestores podem editar os dados da empresa.</p><% } %>
-  </form>
+<main class="page profile-page" data-profile-endpoint="<%= adminCompanyId ? '/api/admin/empresas/' + adminCompanyId + '/perfil' : '/api/empresa/perfil' %>">
+  <header class="page-heading"><span class="eyebrow">PERFIL EMPRESARIAL</span><h1><%= company.nome_fantasia || company.razao_social %></h1><p class="muted">Organize as informações da empresa e mantenha seu perfil atualizado.</p><% if(adminCompanyId) { %><p class="notice">Acesso administrativo ao perfil desta empresa.</p><% } %></header>
+  <section class="panel profile-completion"><h2>Perfil empresarial</h2><strong data-completion-text><%= completion.percentual %>% preenchido</strong><progress data-completion-bar value="<%= completion.percentual %>" max="100" aria-label="Completude do perfil empresarial"></progress><p class="muted">Completude dos dados da empresa, independente da compatibilidade das licitações.</p></section>
+  <% if (saved) { %><p class="notice" role="status">Perfil atualizado com sucesso.</p><% } %>
+  <noscript><p class="notice">Ative o JavaScript para adicionar registros e salvar cada seção do perfil.</p></noscript>
+  <nav class="profile-steps" aria-label="Seções do perfil"><% for (const [i,section] of sections.entries()) { %><a href="#perfil-<%= section.id %>"><%= i+1 %>. <%= section.title %></a><% } %></nav>
+  <% for (const [i,section] of sections.entries()) { const editable = ['gestor','admin'].includes(user.tipo); %>
+  <details class="panel profile-section" id="perfil-<%= section.id %>" <%= i === 0 ? 'open' : '' %>>
+    <summary><span><%= i+1 %>. <%= section.title %></span><span class="muted">Editar seção</span></summary>
+    <p class="muted"><%= section.description %></p>
+    <form data-section="<%= section.id %>" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <fieldset <%= editable ? '' : 'disabled' %>>
+        <% if(section.fields) { const values = section.id === 'empresa' ? {...company,email_empresa:company.email} : section.id === 'comercial' ? profile.comercial : profile; %>
+          <div class="grid two"><%- include('profile/fields', {fields:section.fields,values,groupName:''}) %></div>
+        <% } %>
+        <% for (const group of section.groups || []) { %>
+        <section class="profile-group" data-group="<%= group.name %>"><h3><%= group.title %></h3>
+          <div data-rows class="stack"><% for (const row of profile[group.name]) { %>
+            <article class="profile-row"><div class="grid two"><%- include('profile/fields', {fields:group.fields,values:row,groupName:group.name}) %></div><button type="button" class="button secondary small" data-remove-row>Remover registro</button></article>
+          <% } %></div>
+          <template><article class="profile-row"><div class="grid two"><%- include('profile/fields', {fields:group.fields,values:{},groupName:group.name}) %></div><button type="button" class="button secondary small" data-remove-row>Remover registro</button></article></template>
+          <% if(editable) { %><button type="button" class="button secondary" data-add-row>+ <%= group.add %></button><% } %>
+        </section><% } %>
+      </fieldset>
+      <% if(editable) { %><div class="profile-save"><button class="button" type="submit">Salvar <%= section.title.toLowerCase() %></button><span data-save-status role="status" aria-live="polite"></span></div><% } else { %><p class="muted">Apenas gestores podem editar o perfil da empresa.</p><% } %>
+    </form>
+  </details><% } %>
+  <datalist id="profile-units"><% for(const unit of ['unidade','caixa','pacote','kg','litro','metro','serviço','hora','equipe']) { %><option value="<%= unit %>"><% } %></datalist>
+  <datalist id="profile-regions"><% for(const region of ['Norte','Nordeste','Centro-Oeste','Sudeste','Sul']) { %><option value="<%= region %>"><% } %></datalist>
+  <datalist id="profile-documents"><% for(const document of ['Atestado de capacidade técnica','Balanço patrimonial','Certidões','Contrato social','Documentos fiscais','Outros']) { %><option value="<%= document %>"><% } %></datalist>
+  <datalist id="profile-certifications"><% for(const name of ['ISO','ANVISA','INMETRO','CREA','CRM','CRQ','MAPA']) { %><option value="<%= name %>"><% } %></datalist>
 </main>
 </div>
+<script src="/assets/company-profile.js" defer></script>
 <%- include('../partials/footer') %>

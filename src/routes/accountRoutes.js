@@ -1,3 +1,5 @@
+import { profileSections } from '../utils/companyProfileFields.js';
+import { states } from '../utils/validation.js';
 import { premiumTrialService } from '../services/premiumTrialService.js';
 import { validId } from '../utils/validation.js';
 import { Router } from 'express';
@@ -92,6 +94,20 @@ export function accountRoutes(database, config, logger) {
   router.get('/conta', requireAuth, controller.accountPage);
   router.post(['/conta/senha', '/api/auth/password'], requireAuth, loginLimit, controller.changePassword);
   router.get(['/empresa', '/api/empresa'], requireAuth, controller.company);
+  router.get('/api/empresa/perfil', requireAuth, async (req, res) => res.json(await service.profile.get(req.user.empresa_id)));
+  router.patch('/api/empresa/perfil/:section', requireAuth, requireManager, async (req, res) => {
+    res.json(await service.profile.save(req.user.empresa_id, req.params.section, req.body));
+  });
+  router.get(['/admin/empresas/:id/perfil', '/api/admin/empresas/:id/perfil'], requireAuth, requireAdmin, async (req, res) => {
+    const id = validId(req.params.id);
+    const result = await service.profile.get(id);
+    if (req.path.startsWith('/api/')) return res.json(result);
+    res.render('account/company', { title: 'Perfil Empresarial', ...result, sections: profileSections, states, saved: false, adminCompanyId: id });
+  });
+  router.patch('/api/admin/empresas/:id/perfil/:section', requireAuth, requireAdmin, async (req, res) => {
+    res.json(await service.profile.save(validId(req.params.id), req.params.section, req.body));
+  });
+
   router.post('/empresa', requireAuth, requireManager, controller.updateCompany);
   router.patch('/api/empresa', requireAuth, requireManager, controller.updateCompany);
   router.get(['/usuarios', '/api/usuarios'], requireAuth, requireManager, controller.users);

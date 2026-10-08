@@ -2,7 +2,7 @@
   <aside class="sidebar" aria-label="Menu lateral">
     <div class="sidebar-brand-wrap"><%- include('logo', { href: '/conta' }) %></div>
     <nav class="sidebar-nav" aria-label="Navegação principal">
-      <% const links = [['/busca','Busca por segmento'],['/relatorios','Relatórios'],['/conta','▦ Dashboard'],['/interesses','Interesses'],['/oportunidades','Oportunidades'],['/empresa','Empresa']];
+      <% const links = [['/busca','Busca por segmento'],['/relatorios','Relatórios'],['/conta','▦ Dashboard'],['/interesses','Interesses'],['/oportunidades','Oportunidades'],['/empresa','Perfil empresarial']];
 
       if (['gestor', 'admin'].includes(user.tipo)) links.push(['/usuarios','Usuários']);
       if (user.tipo === 'admin') links.push(['/admin','Admin'],['/admin/operacao','Operação e fontes'],['/admin/testes-premium','Testes Premium']);

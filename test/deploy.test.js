@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { PGlite } from '@electric-sql/pglite';
 import { safeError } from '../src/utils/safeError.js';
 import { parseEnv } from '../src/config/env.js';
-import { checkDatabase, inspectDatabase } from '../src/services/databaseCheckService.js';
+import { checkDatabase, inspectDatabase, requiredTables } from '../src/services/databaseCheckService.js';
 import { readMigrations, runMigrations } from '../src/services/migrationService.js';
 
 test('diagnóstico preserva causa e stack sem URLs, credenciais ou tokens', () => {
@@ -69,14 +69,14 @@ test('verificação somente leitura identifica migrations e tabelas ausentes e c
   } };
   const migrationClient = { query(sql, params) {
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
-    if (sql.includes('CREATE TABLE') || sql.startsWith('ALTER TABLE')) return db.exec(sql);
+    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE')) return db.exec(sql);
     return db.query(sql, params);
   } };
   try {
     await assert.rejects(checkDatabase(readonly), error => error.code === 'DATABASE_SCHEMA_MISMATCH' && error.message.includes('sessoes'));
     const migrations = await readMigrations();
     await runMigrations(migrationClient, migrations);
-    assert.deepEqual(await checkDatabase(readonly), { connection: 'ok', tables: 9, migrations: migrations.length });
+    assert.deepEqual(await checkDatabase(readonly), { connection: 'ok', tables: requiredTables.length, migrations: migrations.length });
     await db.query("UPDATE schema_migrations SET checksum='changed' WHERE name=$1", [migrations[0].name]);
     await assert.rejects(checkDatabase(readonly), /checksums alterados: 001_foundation.sql/);
     await db.query('UPDATE schema_migrations SET checksum=$1 WHERE name=$2', [migrations[0].checksum, migrations[0].name]);
@@ -89,22 +89,22 @@ test('banco parcialmente migrado recebe somente migrations pendentes e preserva 
   const db = new PGlite();
   const client = { query(sql, params) {
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
-    if (sql.includes('CREATE TABLE') || sql.startsWith('ALTER TABLE')) return db.exec(sql);
+    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE')) return db.exec(sql);
     return db.query(sql, params);
   } };
   try {
     const migrations = await readMigrations();
     const empty = await inspectDatabase(db);
-    assert.equal(empty.missingTables.length, 9);
+    assert.equal(empty.missingTables.length, requiredTables.length);
     assert.deepEqual(empty.pending, migrations.map(migration => migration.name));
     await runMigrations(client, migrations.slice(0, 2));
     await db.query("INSERT INTO empresas (razao_social, cnpj, email) VALUES ('Empresa existente', '12345678000199', 'existing@example.test')");
     const before = await inspectDatabase(db);
     assert.deepEqual(before.presentTables, ['schema_migrations', 'empresas', 'usuarios', 'sessoes']);
-    assert.deepEqual(before.missingTables, ['licitacoes_pncp', 'interesses', 'matches', 'tarefas', 'alertas']);
+    assert.deepEqual(before.missingTables, requiredTables.filter(table => !before.presentTables.includes(table)));
     assert.deepEqual(before.pending, migrations.slice(2).map(migration => migration.name));
     assert.deepEqual(await runMigrations(client, migrations), before.pending);
-    assert.deepEqual(await checkDatabase(db), { connection: 'ok', tables: 9, migrations: migrations.length });
+    assert.deepEqual(await checkDatabase(db), { connection: 'ok', tables: requiredTables.length, migrations: migrations.length });
     assert.deepEqual(await runMigrations(client, migrations), []);
     const { rows } = await db.query('SELECT razao_social FROM empresas');
     assert.deepEqual(rows, [{ razao_social: 'Empresa existente' }]);
