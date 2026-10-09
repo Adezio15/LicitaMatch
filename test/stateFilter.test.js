@@ -24,7 +24,7 @@ test('spreadsheet sources are unique and pending portals cannot appear enabled',
   assert.equal(new Set(sources.map(source => source.id)).size, 104);
   assert.equal(sources.find(source => source.id === 'pncp').enabled, true);
   assert.ok(sources.filter(source => source.id !== 'pncp').every(source => !source.enabled && !source.integrated));
-  assert.equal(sources.filter(source => !source.url).length, 2);
+  assert.equal(sources.filter(source => !source.url).length, 0);
 });
 
 test('search and opportunities filter states before counting and pagination', async () => {

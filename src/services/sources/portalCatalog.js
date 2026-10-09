@@ -6,7 +6,8 @@ export function listPortalSources(registry) {
   const registered = registry.listSources(true);
   const catalog = portals.map(portal => {
     const connector = registered.find(source => source.id === portal.id);
-    return { ...portal, enabled: Boolean(connector?.enabled), integrated: Boolean(connector) };
+    return { ...portal, enabled: Boolean(connector?.enabled), integrated: Boolean(connector),
+      collectionMode: connector?.collectionMode };
   });
   for (const source of registered) {
     if (!catalog.some(portal => portal.id === source.id)) {

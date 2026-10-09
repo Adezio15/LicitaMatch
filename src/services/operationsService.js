@@ -1,8 +1,6 @@
 import { premiumTrialService } from './premiumTrialService.js';
 import { sendEmail, sendTestEmail, emailError } from './emailDiagnostics.js';
-import { createPncpSource } from './sources/pncpSource.js';
-import { createComprasnetSource } from './sources/comprasnetSource.js';
-import { createSourceRegistry } from './sources/sourceRegistry.js';
+import { createDefaultSourceRegistry, sourceTaskDefinitions } from './sources/defaultSources.js';
 import { listPortalSources } from './sources/portalCatalog.js';
 import { persistPncpItems } from './pncpPersistenceService.js';
 import { correlateOpportunities } from './opportunityService.js';
@@ -12,10 +10,7 @@ import { safeError } from '../utils/safeError.js';
 import { createWhatsAppService } from './whatsappService.js';
 
 export function createOperationsService({ database, config, logger, registry, emailService, whatsappService }) {
-  registry ||= createSourceRegistry({
-    pncp: { ...createPncpSource(), name: 'PNCP', enabled: config.SYNC_ENABLED === 'true' },
-    comprasnet: { ...createComprasnetSource(), name: 'Compras.gov.br', enabled: config.SYNC_ENABLED === 'true' && config.COMPRASNET_ENABLED === 'true' }
-  });
+  registry ||= createDefaultSourceRegistry(config);
   const emailMinScore = 67;
   if (!emailService && config.EMAIL_ENABLED === 'true') {
     emailService = createEmailService({
@@ -23,12 +18,8 @@ export function createOperationsService({ database, config, logger, registry, em
       from: config.EMAIL_FROM
     });
   }
-  const definitions = [];
+  const definitions = sourceTaskDefinitions(registry, config);
   if (!whatsappService && config.WHATSAPP_ENABLED === 'true') whatsappService = createWhatsAppService({config});
-  for (const source of registry.listSources()) {
-    const modalities = (source.id === 'pncp' ? config.PNCP_MODALIDADES : config.COMPRASNET_MODALIDADES).split(',');
-    for (const modalidade of new Set(modalities)) definitions.push({ name: `sync:${source.id}:${modalidade}`, source: source.id, modalidade });
-  }
   definitions.push({ name: 'matches' });
   if (config.EMAIL_ENABLED === 'true') definitions.push({ name: 'alertas' });
   if (config.WHATSAPP_ENABLED === 'true') definitions.push({name:'alertas_whatsapp'});

@@ -15,612 +15,718 @@
         "id":  "portal-3",
         "name":  "Licitações-e (Banco do Brasil)",
         "url":  "https://www.licitacoes-e.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial retornou HTTP 403 neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-4",
         "name":  "Licitações CAIXA (SICVE)",
         "url":  "https://licitacoes.caixa.gov.br/sicve-web/public/view/portal/portal.jsf",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta redirecionada para verificação de acesso do portal; API ainda não validada."
     },
     {
         "id":  "portal-5",
         "name":  "Correios - Licitações e Contratos",
         "url":  "https://www.correios.com.br/acesso-a-informacao/licitacoes-e-contratos",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-6",
         "name":  "Petronect (Petrobras)",
         "url":  "https://www.petronect.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "documentationUrl":  "https://minhapetronect.com.br/descricao_apistore",
+        "integrationNote":  "API Store oficial encontrada. Acesso depende de conta e das condições de contratação do fornecedor."
     },
     {
         "id":  "portal-7",
         "name":  "Banco Central - Licitações",
         "url":  "https://www.bcb.gov.br/acessoinformacao/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-8",
         "name":  "BNDES - Licitações",
         "url":  "https://www.bndes.gov.br/wps/portal/site/home/transparencia/licitacoes-contratos/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-9",
         "name":  "Portal de Licitações da Marinha",
         "url":  "https://licitacoescontratos.marinha.mil.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial retornou HTTP 403 neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-10",
         "name":  "Portal de Licitações do Acre",
         "url":  "https://licitacao.ac.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-11",
         "name":  "Compras AP",
         "url":  "https://compras.portal.ap.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-12",
         "name":  "e-Compras AM",
         "url":  "https://www.e-compras.am.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-13",
         "name":  "ComprasNet Bahia",
         "url":  "https://www.comprasnet.ba.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-14",
         "name":  "e-Compras DF",
         "url":  "https://portal.compras.df.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-15",
         "name":  "Portal de Compras do Espírito Santo",
         "url":  "https://www.compras.es.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-16",
         "name":  "ComprasNet.GO",
         "url":  "https://www.comprasnet.go.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-17",
         "name":  "Portal de Compras Governamentais do Maranhão",
         "url":  "https://www.compras.ma.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-18",
         "name":  "Portal de Compras MG",
         "url":  "https://www.compras.mg.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "documentationUrl":  "https://www.dados.mg.gov.br/dataset/portal_licitacoes_mg",
+        "integrationNote":  "Dados abertos oficiais localizados; consultas ao endpoint CKAN retornaram HTTP 403 neste ambiente. Conector ainda não validado."
     },
     {
         "id":  "portal-19",
         "name":  "Portal de Aquisições Governamentais de MT",
         "url":  "https://aquisicoes.seplag.mt.gov.br/home",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-20",
         "name":  "Compras Pará",
         "url":  "https://www.sistemas.pa.gov.br/compraspara/public/licitacao_list.xhtml",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-21",
         "name":  "Central de Compras da Paraíba",
         "url":  "https://centraldecompras.pb.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-22",
         "name":  "Compras Paraná",
         "url":  "https://www.administracao.pr.gov.br/Compras/Pagina/Compras-Parana-Consulta-de-Editais-e-Licitacoes",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-23",
         "name":  "Compras e Licitações Pernambuco",
         "url":  "https://www.sad.pe.gov.br/compras-e-licitacoes",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-24",
         "name":  "Central de Compras do Piauí",
         "url":  "https://centraldecompras.sead.pi.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-25",
         "name":  "Portal de Compras do RN",
         "url":  "https://www.compras.rn.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-26",
         "name":  "Compras Eletrônicas RS",
         "url":  "https://www.compras.rs.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta JSON do portal identificada; validação retornou timeout. Conector ainda não validado."
     },
     {
         "id":  "portal-27",
         "name":  "Portal de Compras Eletrônicas PROCERGS",
         "url":  "https://www.compras.procergs.rs.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta JSON do portal identificada; validação retornou timeout. Conector ainda não validado."
     },
     {
         "id":  "portal-28",
         "name":  "SUPEL Rondônia - Licitações",
         "url":  "https://rondonia.ro.gov.br/supel/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-29",
         "name":  "SELC Roraima",
         "url":  "https://selc.rr.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-30",
         "name":  "Portal de Compras SC",
         "url":  "https://compras.sc.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-31",
         "name":  "BEC/SP - Bolsa Eletrônica de Compras",
         "url":  "https://www.bec.sp.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-32",
         "name":  "ComprasNet Sergipe",
         "url":  "https://www.comprasnet.se.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-33",
         "name":  "Portal de Compras do Tocantins",
         "url":  "https://portaldecompras.to.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-34",
         "name":  "Portal de Compras da Cidade de São Paulo",
         "url":  "https://compras.prefeitura.sp.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-35",
         "name":  "E-Compras Rio",
         "url":  "https://ecomprasrio.rio.rj.gov.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-36",
         "name":  "Portal de Compras de Fortaleza",
         "url":  "https://compras.sepog.fortaleza.ce.gov.br/publico/licitacoes.asp",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-37",
         "name":  "Portal de Compras do Recife",
         "url":  "https://portaldecompras.recife.pe.gov.br/app/home.php",
-        "apiUrl":  null
+        "apiUrl":  "https://dados.recife.pe.gov.br/api/3/action/datastore_search?resource_id=9771bedc-6f2e-43f0-bd4c-25b0de5500b5",
+        "documentationUrl":  "https://dados.recife.pe.gov.br/pt_BR/dataset/licitacoes"
     },
     {
         "id":  "portal-38",
         "name":  "Portal de Licitações do TCE Ceará (municípios)",
         "url":  "https://municipios-licitacoes.tce.ce.gov.br/index.php/licitacao/abertas",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "documentationUrl":  "https://api-dados-abertos.tce.ce.gov.br/sim/",
+        "integrationNote":  "API SIM encontrada: especificação exige autenticação Basic e informa restrição a IPs no Brasil. Acesso sem credenciais ainda não validado."
     },
     {
         "id":  "portal-39",
         "name":  "Licitanet",
         "url":  "https://licitanet.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial retornou HTTP 403 neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-40",
         "name":  "Licitar Digital",
         "url":  "https://licitar.digital/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-41",
         "name":  "BNC - Bolsa Nacional de Compras",
         "url":  "https://bnccompras.com/Process/ProcessSearchPublic?param1=0",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-42",
         "name":  "PE Integrago",
         "url":  "https://www.peintegrado.pe.gov.br/Default.aspx",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-43",
         "name":  "M2A Compras",
         "url":  "https://compras.m2atecnologia.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-44",
         "name":  "AMM Licita",
         "url":  "https://ammlicita.org.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Consulta à página oficial retornou HTTP 406 neste ambiente; API ainda não validada."
     },
     {
         "id":  "portal-45",
         "name":  "BLL Compras",
         "url":  "https://bll.org.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-46",
         "name":  "Portal de Compras Públicas",
         "url":  "https://www.portaldecompraspublicas.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "documentationUrl":  "https://apipcp.portaldecompraspublicas.com.br/publico/apidoc/",
+        "integrationNote":  "Documentação oficial localizada; a API de busca automatizada exige publicKey do fornecedor. Sem credencial disponível."
     },
     {
         "id":  "portal-47",
         "name":  "ComprasBR",
         "url":  "https://comprasbr.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-48",
         "name":  "BBM Net",
         "url":  "https://bbmnet.com.br/",
-        "apiUrl":  null
+        "apiUrl":  null,
+        "integrationNote":  "Página oficial consultada; API de licitações ainda não validada."
     },
     {
         "id":  "portal-49",
         "name":  "Sesc DN - Portal de Compras",
         "url":  "https://egov-br.paradigmabs.com.br/sescdn/Default.aspx",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-dn.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-dn.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-50",
         "name":  "Sesc AC - Sistema de Licitações",
         "url":  "http://cpl.sescacre.com.br/editais/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ac.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ac.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-51",
         "name":  "Sesc AL - Licitações",
         "url":  "https://www.sescalagoas.com.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-al.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-al.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-52",
         "name":  "Sesc AP - Licitações",
         "url":  "https://www.sescamapa.com.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ap.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ap.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-53",
         "name":  "Sesc AM - Licitações",
         "url":  "https://www.sesc-am.com.br/home/attachment/licitacao-2",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-am.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-am.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-54",
         "name":  "Sesc BA - Licitações",
         "url":  "https://www.sescbahia.com.br/pagina/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ba.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ba.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-55",
         "name":  "Sesc CE - Sistema LICITASESC",
         "url":  "https://sistemas.sesc-ce.com.br/LICITASESC/download/licitacaoList.seam",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ce.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ce.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-56",
         "name":  "Sesc DF - Portal de Compras",
         "url":  "https://sescdf.com.br/portal-de-compras",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-df.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-df.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-57",
         "name":  "Sesc ES - Licitações e Editais",
         "url":  "https://sesc-es.com.br/licitacoes-e-editais/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-es.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-es.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-58",
         "name":  "Sesc GO - Sistema de Licitações",
         "url":  "https://www3.sescgo.com.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-go.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-go.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-59",
         "name":  "Sesc MA - Licitações",
         "url":  "https://sescma.com.br/licitacao_new/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ma.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ma.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-60",
         "name":  "Sesc MT - Licitações",
         "url":  "https://www.sescmt.com.br/index.php/licitacao/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-mt.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-mt.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-61",
         "name":  "Sesc MS - Licitações",
         "url":  "https://www.sescms.com.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ms.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ms.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-62",
         "name":  "Sesc MG - Licitações",
         "url":  "https://sescmg.com.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-mg.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-mg.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-63",
         "name":  "Sesc PA - Licitações",
         "url":  "https://sesc-pa.com.br/licitacao",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-pa.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-pa.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-64",
         "name":  "Sesc PB - Transparência (Licitações)",
         "url":  "https://www.sescpb.com.br/transparencia/#/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-pb.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-pb.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-65",
         "name":  "Sesc PR - Licitações",
         "url":  "https://www.sescpr.com.br/licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-pr.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-pr.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-66",
         "name":  "Sesc PE - Portal de Licitações",
         "url":  "https://licitacoes.sescpe.com.br/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-pe.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-pe.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-67",
         "name":  "Sesc PI - Licitações",
         "url":  "http://www.sescpiaui.com.br/licitacao/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-pi.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-pi.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-68",
         "name":  "Sesc RJ - Transparência (Licitações)",
         "url":  "https://egov.paradigmabs.com.br/sescrj/portal/Mural.aspx?nNmTela=E",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-rj.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-rj.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-69",
         "name":  "Sesc RN - Licitações",
         "url":  "https://sescrn.com.br/pagina-licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-rn.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-rn.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-70",
         "name":  "Sesc RS - Transparência (Licitações)",
         "url":  "https://www.sesc-rs.com.br/licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-rs.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-rs.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-71",
         "name":  "Sesc RO - Licitações",
         "url":  "https://sescro.com.br/licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-ro.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-ro.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-72",
         "name":  "Sesc RR - Transparência (Licitações)",
         "url":  "https://licitacao.sescrr.com.br/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-rr.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-rr.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-73",
         "name":  "Sesc SC - Sistema de Licitações",
         "url":  "https://www.sesc-sc.com.br/sobre-o-sesc/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-sc.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-sc.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-74",
         "name":  "Sesc SP - Licitações e Contratações",
         "url":  "https://www.sescsp.org.br/licitacoes-e-contratacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-sp.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-sp.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-75",
         "name":  "Sesc SE - Licitações",
         "url":  "https://sesc-se.com.br/licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-se.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-se.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-76",
         "name":  "Sesc TO - Licitações",
         "url":  "https://www.sescto.com.br/licitacao",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia-to.sesc.com.br/transparencia/dados/api/216",
+        "documentationUrl":  "https://transparencia-to.sesc.com.br/transparencia/dados/dados_abertos/216/webservice"
     },
     {
         "id":  "portal-77",
         "name":  "Senac AC",
         "url":  "https://portal.ac.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ac",
+        "documentationUrl":  "https://transparencia.senac.br/#/ac/licitacoes"
     },
     {
         "id":  "portal-78",
         "name":  "Senac ES",
         "url":  "https://es.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/es",
+        "documentationUrl":  "https://transparencia.senac.br/#/es/licitacoes"
     },
     {
         "id":  "portal-79",
         "name":  "Senac MS",
         "url":  "https://ms.senac.br/senac/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ms",
+        "documentationUrl":  "https://transparencia.senac.br/#/ms/licitacoes"
     },
     {
         "id":  "portal-80",
         "name":  "Senac PR",
         "url":  "https://www.pr.senac.br/licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/pr",
+        "documentationUrl":  "https://transparencia.senac.br/#/pr/licitacoes"
     },
     {
         "id":  "portal-81",
         "name":  "Senac RN",
         "url":  "https://licitacoes.rn.senac.br/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/rn",
+        "documentationUrl":  "https://transparencia.senac.br/#/rn/licitacoes"
     },
     {
         "id":  "portal-82",
         "name":  "Senac SP",
         "url":  "https://licitacao.sp.senac.br/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/sp",
+        "documentationUrl":  "https://transparencia.senac.br/#/sp/licitacoes"
     },
     {
         "id":  "portal-83",
         "name":  "Senac DN - Transparência",
-        "url":  "",
-        "apiUrl":  null
+        "url":  "https://transparencia.senac.br/#/dn/licitacoes",
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/dn",
+        "documentationUrl":  "https://transparencia.senac.br/#/dn/licitacoes"
     },
     {
         "id":  "portal-84",
         "name":  "Senac AL",
         "url":  "https://transparencia.senac.br/#/al/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/al",
+        "documentationUrl":  "https://transparencia.senac.br/#/al/licitacoes"
     },
     {
         "id":  "portal-85",
         "name":  "Senac AP",
         "url":  "https://transparencia.senac.br/#/ap/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ap",
+        "documentationUrl":  "https://transparencia.senac.br/#/ap/licitacoes"
     },
     {
         "id":  "portal-86",
         "name":  "Senac AM",
         "url":  "https://am.senac.br/licitacoes/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/am",
+        "documentationUrl":  "https://transparencia.senac.br/#/am/licitacoes"
     },
     {
         "id":  "portal-87",
         "name":  "Senac BA",
         "url":  "https://www.BA.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ba",
+        "documentationUrl":  "https://transparencia.senac.br/#/ba/licitacoes"
     },
     {
         "id":  "portal-88",
         "name":  "Senac CE",
         "url":  "https://www.CE.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ce",
+        "documentationUrl":  "https://transparencia.senac.br/#/ce/licitacoes"
     },
     {
         "id":  "portal-89",
         "name":  "Senac DF",
         "url":  "https://www.DF.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/df",
+        "documentationUrl":  "https://transparencia.senac.br/#/df/licitacoes"
     },
     {
         "id":  "portal-90",
         "name":  "Senac GO",
         "url":  "https://v1.go.senac.br/portal/fornecedor",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/go",
+        "documentationUrl":  "https://transparencia.senac.br/#/go/licitacoes"
     },
     {
         "id":  "portal-91",
         "name":  "Senac MA",
         "url":  "https://www.MA.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ma",
+        "documentationUrl":  "https://transparencia.senac.br/#/ma/licitacoes"
     },
     {
         "id":  "portal-92",
         "name":  "Senac MT",
         "url":  "https://www.mt.senac.br/Licitacoes/Legislacao/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/mt",
+        "documentationUrl":  "https://transparencia.senac.br/#/mt/licitacoes"
     },
     {
         "id":  "portal-93",
         "name":  "Senac MG",
         "url":  "https://transparencia.senac.br/#/mg/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/mg",
+        "documentationUrl":  "https://transparencia.senac.br/#/mg/licitacoes"
     },
     {
         "id":  "portal-94",
         "name":  "Senac PA",
         "url":  "https://transparencia.senac.br/#/pa/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/pa",
+        "documentationUrl":  "https://transparencia.senac.br/#/pa/licitacoes"
     },
     {
         "id":  "portal-95",
         "name":  "Senac PB",
         "url":  "https://transparencia.senac.br/#/pb/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/pb",
+        "documentationUrl":  "https://transparencia.senac.br/#/pb/licitacoes"
     },
     {
         "id":  "portal-96",
         "name":  "Senac PE",
         "url":  "https://www.PE.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/pe",
+        "documentationUrl":  "https://transparencia.senac.br/#/pe/licitacoes"
     },
     {
         "id":  "portal-97",
         "name":  "Senac PI",
         "url":  "https://licitacao.pi.senac.br/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/pi",
+        "documentationUrl":  "https://transparencia.senac.br/#/pi/licitacoes"
     },
     {
         "id":  "portal-98",
         "name":  "Senac RJ",
-        "url":  "",
-        "apiUrl":  null
+        "url":  "https://transparencia.senac.br/#/rj/licitacoes",
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/rj",
+        "documentationUrl":  "https://transparencia.senac.br/#/rj/licitacoes"
     },
     {
         "id":  "portal-99",
         "name":  "Senac RS",
         "url":  "https://egov.paradigmabs.com.br/sesc_senac_rs/Portal/Mural.aspx",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/rs",
+        "documentationUrl":  "https://transparencia.senac.br/#/rs/licitacoes"
     },
     {
         "id":  "portal-100",
         "name":  "Senac RO",
         "url":  "https://www.RO.senac.br/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/ro",
+        "documentationUrl":  "https://transparencia.senac.br/#/ro/licitacoes"
     },
     {
         "id":  "portal-101",
         "name":  "Senac RR",
         "url":  "https://transparencia.senac.br/#/rr/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/rr",
+        "documentationUrl":  "https://transparencia.senac.br/#/rr/licitacoes"
     },
     {
         "id":  "portal-102",
         "name":  "Senac SC",
         "url":  "https://licitacao.sc.senac.br/",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/sc",
+        "documentationUrl":  "https://transparencia.senac.br/#/sc/licitacoes"
     },
     {
         "id":  "portal-103",
         "name":  "Senac SE",
         "url":  "https://transparencia.senac.br/#/se/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/se",
+        "documentationUrl":  "https://transparencia.senac.br/#/se/licitacoes"
     },
     {
         "id":  "portal-104",
         "name":  "Senac TO",
         "url":  "https://transparencia.senac.br/#/to/licitacoes",
-        "apiUrl":  null
+        "apiUrl":  "https://transparencia.senac.br/service/api/licitacoes/regional/to",
+        "documentationUrl":  "https://transparencia.senac.br/#/to/licitacoes"
     }
 ]

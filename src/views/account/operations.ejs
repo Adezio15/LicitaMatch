@@ -20,7 +20,10 @@
 <section class="panel section-gap"><h2>Fontes</h2>
 <p class="muted">Portais da planilha. Apenas fontes com integração disponível participam da coleta automática.</p>
 <% for (const source of data.sources) { %>
-<p><strong><% if (source.url) { %><a href="<%= source.url %>" target="_blank" rel="noopener noreferrer"><%= source.name %></a><% } else { %><%= source.name %><% } %></strong> — <%= source.integrated ? (source.enabled ? 'API integrada · Ativa' : 'API integrada · Desativada') : (source.url ? 'Integração pendente · API/documentação de acesso necessária' : 'Integração pendente · URL não informada na planilha') %></p>
+<p><strong><% if (source.url) { %><a href="<%= source.url %>" target="_blank" rel="noopener noreferrer"><%= source.name %></a><% } else { %><%= source.name %><% } %></strong> — <%= source.integrated ? (source.enabled ? 'API integrada · Ativa' : 'API integrada · Desativada') : (source.url ? 'Integração pendente · Sem conector validado' : 'Integração pendente · URL não informada na planilha') %></p>
+<% if (source.apiUrl) { %><p class="muted"><a href="<%= source.apiUrl %>" target="_blank" rel="noopener noreferrer">API oficial</a><% if (source.collectionMode === 'snapshot') { %> · Consulta de processos em andamento; atualização conforme a fonte.<% } %></p><% } %>
+<% if (!source.integrated && source.integrationNote) { %><p class="muted"><%= source.integrationNote %></p><% } %>
+<% if (source.documentationUrl) { %><p class="muted"><a href="<%= source.documentationUrl %>" target="_blank" rel="noopener noreferrer">Documentação / transparência oficial</a></p><% } %>
 <% } %></section>
 <section class="panel section-gap"><h2>Últimas execuções</h2>
 <% const format = value => value ? new Date(value).toLocaleString('pt-BR',{timeZone:'America/Fortaleza'}) : 'Ainda não executado'; const states = { aguardando:'Aguardando',executando:'Em execução',concluido:'Concluído',parcial:'Concluído com falhas de envio',falhou:'Falhou — consulte os logs do servidor' }; %>

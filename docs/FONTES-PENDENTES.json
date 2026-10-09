@@ -1,0 +1,321 @@
+[
+  {
+    "id": "portal-3",
+    "name": "Licitações-e (Banco do Brasil)",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.licitacoes-e.com.br/",
+    "observation": "Consulta à página oficial retornou HTTP 403 neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-4",
+    "name": "Licitações CAIXA (SICVE)",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://licitacoes.caixa.gov.br/sicve-web/public/view/portal/portal.jsf",
+    "observation": "Consulta redirecionada para verificação de acesso do portal; API ainda não validada."
+  },
+  {
+    "id": "portal-5",
+    "name": "Correios - Licitações e Contratos",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.correios.com.br/acesso-a-informacao/licitacoes-e-contratos",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-6",
+    "name": "Petronect (Petrobras)",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.petronect.com.br/",
+    "observation": "API Store oficial encontrada. Acesso depende de conta e das condições de contratação do fornecedor.",
+    "documentationUrl": "https://minhapetronect.com.br/descricao_apistore"
+  },
+  {
+    "id": "portal-7",
+    "name": "Banco Central - Licitações",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.bcb.gov.br/acessoinformacao/licitacoes",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-8",
+    "name": "BNDES - Licitações",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.bndes.gov.br/wps/portal/site/home/transparencia/licitacoes-contratos/licitacoes",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-9",
+    "name": "Portal de Licitações da Marinha",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://licitacoescontratos.marinha.mil.br/",
+    "observation": "Consulta à página oficial retornou HTTP 403 neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-10",
+    "name": "Portal de Licitações do Acre",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://licitacao.ac.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-11",
+    "name": "Compras AP",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://compras.portal.ap.gov.br/",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-12",
+    "name": "e-Compras AM",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.e-compras.am.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-13",
+    "name": "ComprasNet Bahia",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.comprasnet.ba.gov.br/",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-14",
+    "name": "e-Compras DF",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://portal.compras.df.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-15",
+    "name": "Portal de Compras do Espírito Santo",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.compras.es.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-16",
+    "name": "ComprasNet.GO",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.comprasnet.go.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-17",
+    "name": "Portal de Compras Governamentais do Maranhão",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.compras.ma.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-18",
+    "name": "Portal de Compras MG",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.compras.mg.gov.br/",
+    "observation": "Dados abertos oficiais localizados; consultas ao endpoint CKAN retornaram HTTP 403 neste ambiente. Conector ainda não validado.",
+    "documentationUrl": "https://www.dados.mg.gov.br/dataset/portal_licitacoes_mg"
+  },
+  {
+    "id": "portal-19",
+    "name": "Portal de Aquisições Governamentais de MT",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://aquisicoes.seplag.mt.gov.br/home",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-20",
+    "name": "Compras Pará",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.sistemas.pa.gov.br/compraspara/public/licitacao_list.xhtml",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-21",
+    "name": "Central de Compras da Paraíba",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://centraldecompras.pb.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-22",
+    "name": "Compras Paraná",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.administracao.pr.gov.br/Compras/Pagina/Compras-Parana-Consulta-de-Editais-e-Licitacoes",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-23",
+    "name": "Compras e Licitações Pernambuco",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.sad.pe.gov.br/compras-e-licitacoes",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-24",
+    "name": "Central de Compras do Piauí",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://centraldecompras.sead.pi.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-25",
+    "name": "Portal de Compras do RN",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.compras.rn.gov.br/",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-26",
+    "name": "Compras Eletrônicas RS",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.compras.rs.gov.br/",
+    "observation": "Consulta JSON do portal identificada; validação retornou timeout. Conector ainda não validado."
+  },
+  {
+    "id": "portal-27",
+    "name": "Portal de Compras Eletrônicas PROCERGS",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.compras.procergs.rs.gov.br/",
+    "observation": "Consulta JSON do portal identificada; validação retornou timeout. Conector ainda não validado."
+  },
+  {
+    "id": "portal-28",
+    "name": "SUPEL Rondônia - Licitações",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://rondonia.ro.gov.br/supel/licitacoes",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-29",
+    "name": "SELC Roraima",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://selc.rr.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-30",
+    "name": "Portal de Compras SC",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://compras.sc.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-31",
+    "name": "BEC/SP - Bolsa Eletrônica de Compras",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.bec.sp.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-32",
+    "name": "ComprasNet Sergipe",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.comprasnet.se.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-33",
+    "name": "Portal de Compras do Tocantins",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://portaldecompras.to.gov.br/",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-34",
+    "name": "Portal de Compras da Cidade de São Paulo",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://compras.prefeitura.sp.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-35",
+    "name": "E-Compras Rio",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://ecomprasrio.rio.rj.gov.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-36",
+    "name": "Portal de Compras de Fortaleza",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://compras.sepog.fortaleza.ce.gov.br/publico/licitacoes.asp",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-38",
+    "name": "Portal de Licitações do TCE Ceará (municípios)",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://municipios-licitacoes.tce.ce.gov.br/index.php/licitacao/abertas",
+    "observation": "API SIM encontrada: especificação exige autenticação Basic e informa restrição a IPs no Brasil. Acesso sem credenciais ainda não validado.",
+    "documentationUrl": "https://api-dados-abertos.tce.ce.gov.br/sim/"
+  },
+  {
+    "id": "portal-39",
+    "name": "Licitanet",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://licitanet.com.br/",
+    "observation": "Consulta à página oficial retornou HTTP 403 neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-40",
+    "name": "Licitar Digital",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://licitar.digital/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-41",
+    "name": "BNC - Bolsa Nacional de Compras",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://bnccompras.com/Process/ProcessSearchPublic?param1=0",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-42",
+    "name": "PE Integrago",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.peintegrado.pe.gov.br/Default.aspx",
+    "observation": "Consulta à página oficial falhou por conexão ou timeout neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-43",
+    "name": "M2A Compras",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://compras.m2atecnologia.com.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-44",
+    "name": "AMM Licita",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://ammlicita.org.br/",
+    "observation": "Consulta à página oficial retornou HTTP 406 neste ambiente; API ainda não validada."
+  },
+  {
+    "id": "portal-45",
+    "name": "BLL Compras",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://bll.org.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-46",
+    "name": "Portal de Compras Públicas",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://www.portaldecompraspublicas.com.br/",
+    "observation": "Documentação oficial localizada; a API de busca automatizada exige publicKey do fornecedor. Sem credencial disponível.",
+    "documentationUrl": "https://apipcp.portaldecompraspublicas.com.br/publico/apidoc/"
+  },
+  {
+    "id": "portal-47",
+    "name": "ComprasBR",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://comprasbr.com.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  },
+  {
+    "id": "portal-48",
+    "name": "BBM Net",
+    "checkedOn": "2026-10-09",
+    "portalUrl": "https://bbmnet.com.br/",
+    "observation": "Página oficial consultada; API de licitações ainda não validada."
+  }
+]
