@@ -35,6 +35,7 @@ function formatText(item = {}, score, interestName, customer) {
     `- Modalidade: ${item?.modalidade || 'N/D'}`,
     `- Unidade gestora: ${item?.unidadeGestora || 'Não informado'}`,
     `- Objeto: ${item?.objeto || 'Não informado'}`,
+    item?.urlFonte ? `- Consultar fonte oficial: ${item.urlFonte}` : 'Link oficial não disponível',
     ``,
     `Acesse o painel do LicitaMatch para revisar a oportunidade.`
   ].join('\n');
@@ -65,6 +66,7 @@ export function createEmailService({ transport, from = 'alertas@licitamatch.loca
           <p><strong>Objeto:</strong> ${escapeHtml(item?.objeto || 'Não informado')}</p>
           <p><strong>Modalidade:</strong> ${escapeHtml(item?.modalidade || 'N/D')}</p>
           <p><strong>Unidade gestora:</strong> ${escapeHtml(item?.unidadeGestora || 'Não informado')}</p>
+          <p>${item?.urlFonte ? `<a href="${escapeHtml(item.urlFonte)}" target="_blank" rel="noopener noreferrer">Consultar fonte oficial</a>` : 'Link oficial não disponível'}</p>
         </div>
       `;
 

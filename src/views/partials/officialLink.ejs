@@ -1,5 +1,6 @@
-<% if (user.plano !== 'sem_plano' && item.link_edital) { %>
-  <p><a class="button" href="<%= item.link_edital %>" target="_blank" rel="noopener noreferrer" aria-label="Ver edital na fonte oficial (abre em nova aba)">↗ Ver edital</a></p>
+<% const officialHref = typeof item !== 'undefined' ? (item.link_edital || item.url_fonte) : (typeof urlFonte !== 'undefined' ? urlFonte : null); %>
+<% if (user.plano !== 'sem_plano' && officialHref) { %>
+  <p><a class="button" href="<%= officialHref %>" target="_blank" rel="noopener noreferrer" aria-label="Ver edital na fonte oficial (abre em nova aba)">↗ Ver edital</a></p>
 <% } else { %>
-  <p class="muted">Link oficial não disponibilizado pela fonte.</p>
+  <p class="muted">Link oficial não disponível</p>
 <% } %>

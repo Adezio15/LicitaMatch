@@ -17,7 +17,11 @@
 <p class="muted"><%= data.diagnostics.whatsapp %></p>
 <% if (data.workerEnabled) { %><form method="post" action="/admin/operacao/sincronizar"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="button">Atualizar fontes e oportunidades</button></form><% } %>
 </section>
-<section class="panel section-gap"><h2>Fontes</h2><% for (const source of data.sources) { %><p><strong><%= source.name %></strong> — <%= source.enabled ? 'Ativa' : 'Desativada' %></p><% } %></section>
+<section class="panel section-gap"><h2>Fontes</h2>
+<p class="muted">Portais da planilha. Apenas fontes com integração disponível participam da coleta automática.</p>
+<% for (const source of data.sources) { %>
+<p><strong><% if (source.url) { %><a href="<%= source.url %>" target="_blank" rel="noopener noreferrer"><%= source.name %></a><% } else { %><%= source.name %><% } %></strong> — <%= source.integrated ? (source.enabled ? 'API integrada · Ativa' : 'API integrada · Desativada') : (source.url ? 'Integração pendente · API/documentação de acesso necessária' : 'Integração pendente · URL não informada na planilha') %></p>
+<% } %></section>
 <section class="panel section-gap"><h2>Últimas execuções</h2>
 <% const format = value => value ? new Date(value).toLocaleString('pt-BR',{timeZone:'America/Fortaleza'}) : 'Ainda não executado'; const states = { aguardando:'Aguardando',executando:'Em execução',concluido:'Concluído',parcial:'Concluído com falhas de envio',falhou:'Falhou — consulte os logs do servidor' }; %>
 <% if (!data.tasks.length) { %><p>Nenhuma execução registrada.</p><% } else { %><div class="table-wrap"><table><thead><tr><th>Tarefa</th><th>Situação</th><th>Último sucesso</th><th>Próxima execução</th><th>Resultado</th></tr></thead><tbody>

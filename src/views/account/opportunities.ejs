@@ -4,7 +4,9 @@
   <header class="page-heading"><span class="eyebrow">LICITAÇÕES</span><h1>Oportunidades</h1><p>Revise as compras relacionadas aos interesses ativos da sua empresa.</p></header>
   <p class="notice">Pregão eletrônico em todo o Brasil. Pregão presencial somente no Rio Grande do Norte (RN) e na Paraíba (PB). Esta regra também vale para os alertas por e-mail e WhatsApp.</p>
   <% const labels = { novo: 'Nova', revisado: 'Revisada', aceito: 'Aceita', recusado: 'Recusada' }; %>
+  <% const stateQuery = (filters.uf || []).map(uf => '&uf=' + encodeURIComponent(uf)).join(''); %>
   <form method="get" class="panel grid two">
+    <%- include('../partials/stateFilter', { states, filters }) %>
     <label>Buscar no objeto<input name="q" maxlength="150" value="<%= filters.q %>"></label>
     <label>Situação<select name="status"><option value="">Todas</option><% for (const [value,label] of Object.entries(labels)) { %><option value="<%= value %>" <%= filters.status===value ? 'selected' : '' %>><%= label %></option><% } %></select></label>
     <label>Correlação mínima (%)<input type="number" name="score" min="0" max="100" value="<%= filters.score %>"></label><button class="button" type="submit">Filtrar oportunidades</button>
@@ -22,6 +24,6 @@
       </form><% } %>
     </article>
   <% } %>
-  <nav aria-label="Paginação" class="section-gap"><% if (filters.page>1) { %><a class="button secondary" href="?page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Anterior</a><% } %> <span>Página <%= filters.page %> de <%= pages %></span> <% if (filters.page<pages) { %><a class="button secondary" href="?page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Próxima</a><% } %></nav>
+  <nav aria-label="Paginação" class="section-gap"><% if (filters.page>1) { %><a class="button secondary" href="?<%= stateQuery.slice(1) %>&amp;page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Anterior</a><% } %> <span>Página <%= filters.page %> de <%= pages %></span> <% if (filters.page<pages) { %><a class="button secondary" href="?<%= stateQuery.slice(1) %>&amp;page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;status=<%= filters.status %>&amp;score=<%= filters.score %>">Próxima</a><% } %></nav>
 </main></div>
 <%- include('../partials/footer') %>

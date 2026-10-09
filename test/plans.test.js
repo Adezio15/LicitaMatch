@@ -56,7 +56,9 @@ test('planos: migração, URLs, APIs, limites e alteração administrativa', asy
         }
         if (plan === 'premium') {
           const report = await agent.get('/api/relatorios').expect(200);
-          assert.deepEqual(report.body.items, [{status:'novo',total:1,score_medio:100}]);
+          assert.equal(report.body.tipo, 'oportunidades');
+          assert.equal(report.body.total, 1);
+          assert.equal(report.body.rows[0].score, 100);
         }
         for (const path of ['/conta/alertas','/api/conta/alertas']) await agent.post(path).set('X-CSRF-Token',token)
           .send({alertas_email:true}).expect(plan === 'start' ? 403 : path.startsWith('/api/') ? 200 : 303);

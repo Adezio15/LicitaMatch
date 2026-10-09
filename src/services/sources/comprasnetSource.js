@@ -2,6 +2,7 @@ import { officialUrlFromRecord } from './officialUrl.js';
 import { fetchJson, queryWindow, unitName } from './httpSource.js';
 import { scrapeComprasnetFallback } from './webScraper.js';
 import { normalizeUf, pncpModalidade } from './procurementMetadata.js';
+import { officialLink, sourceCity } from './officialLink.js';
 const DEFAULT_COMPRASNET_URL = 'https://dadosabertos.compras.gov.br/modulo-contratacoes/1_consultarContratacoes_PNCP_14133';
 
 export function normalizeComprasnetItems(payload) {
@@ -16,8 +17,11 @@ export function normalizeComprasnetItems(payload) {
     const modalidade = pncpModalidade(item?.modalidadeIdPncp, item?.modalidadeNome || item?.modalidade || item?.tipo);
     const uf = normalizeUf(item?.unidadeOrgaoUfSigla || item?.unidadeOrgao?.ufSigla || item?.uf);
     if (!id || !objeto || !unidadeGestora || !dataAbertura || Number.isNaN(Date.parse(dataAbertura))) return null;
+    const urlFonte = officialLink(item);
     const link = officialUrlFromRecord(item);
-    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(link ? { link_edital: link } : {}), ...(uf ? { uf } : {}) };
+    const cidade = sourceCity(item?.unidadeOrgaoMunicipioNome || item?.unidadeOrgao?.municipioNome || item?.cidade || item?.municipioNome);
+    return { id,objeto,dataAbertura,unidadeGestora,modalidade, ...(uf ? { uf } : {}),
+      ...(link ? { link_edital: link } : {}), ...(urlFonte ? { urlFonte } : {}), ...(cidade ? { cidade } : {}) };
   }).filter(Boolean);
 }
 

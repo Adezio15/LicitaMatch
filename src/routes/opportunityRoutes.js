@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { requireAuth, requireManager } from '../middlewares/auth.js';
 import { opportunityService, interestSchema, statusSchema, filterSchema, alertPreferenceSchema, whatsappPreferenceSchema } from '../services/opportunityService.js';
-import { validate, validId } from '../utils/validation.js';
+import { validate, validId, states } from '../utils/validation.js';
 import { requireFeature, assertFeature } from '../services/planService.js';
+import { reportService, reportFilterSchema, reportTitles, statusLabels, REPORT_TIMEZONE } from '../services/reportService.js';
+import { createReportPdf } from '../services/reportPdfService.js';
 
 export function opportunityRoutes(database) {
   const router = Router();
   const service = opportunityService(database);
+  const reports = reportService(database);
   router.post(['/conta/whatsapp','/api/conta/whatsapp'],requireAuth,requireManager,requireFeature('whatsapp'),async (req,res)=>{
     const data = validate(whatsappPreferenceSchema,req.body);
     await database.query(`UPDATE usuarios SET whatsapp_numero=$3,alertas_whatsapp=$4,
@@ -45,11 +48,11 @@ export function opportunityRoutes(database) {
       if (filters.score || filters.status) assertFeature(req.user.plano, 'match');
       const data = await service.search(req.user.empresa_id, filters);
       if (req.path.startsWith('/api/')) return res.json(data);
-      return res.render('account/search', { title: 'Oportunidades', ...data, interests: await service.interests(req.user.empresa_id) });
+      return res.render('account/search', { title: 'Oportunidades', states, ...data, interests: await service.interests(req.user.empresa_id) });
     }
     const data = await service.list(req.user.empresa_id,filters);
     if (req.path.startsWith('/api/')) return res.json(data);
-    res.render('account/opportunities', { title: 'Oportunidades', ...data });
+    res.render('account/opportunities', { title: 'Oportunidades', states, ...data });
   });
   router.get(['/oportunidades/:id','/api/oportunidades/:id'],requireAuth,async(req,res)=>{
     if(req.user.plano==='sem_plano') {
@@ -75,12 +78,22 @@ export function opportunityRoutes(database) {
     }
     const data = await service.search(req.user.empresa_id,validate(filterSchema,req.query));
     if (req.path.startsWith('/api/')) return res.json(data);
-    res.render('account/search', { title: 'Busca por segmento', ...data, interests: await service.interests(req.user.empresa_id) });
+    res.render('account/search', { title: 'Busca por segmento', states, ...data, interests: await service.interests(req.user.empresa_id) });
   });
   router.get(['/relatorios','/api/relatorios'], requireAuth, requireFeature('reports'), async (req,res) => {
-    const items = await service.report(req.user.empresa_id);
-    if (req.path.startsWith('/api/')) return res.json({ items });
-    res.render('account/reports', { title: 'Relatórios', items });
+    const data = await reports.run(req.user.empresa_id,validate(reportFilterSchema,req.query));
+    if (req.path.startsWith('/api/')) return res.json(data);
+    res.render('account/reports', { ...data, states, reportTitles,statusLabels,
+      interests: await reports.interests(req.user.empresa_id),
+      reportQuery: overrides => new URLSearchParams({...data.filters,...overrides}).toString(),
+      reportDate: value => value ? new Date(value).toLocaleString('pt-BR',{timeZone:REPORT_TIMEZONE}) : 'Não informada' });
+  });
+  router.get(['/relatorios/pdf','/api/relatorios/pdf'], requireAuth, requireFeature('reports'), async (req,res) => {
+    const data = await reports.run(req.user.empresa_id,validate(reportFilterSchema,req.query),{pdf:true});
+    const interests = await reports.interests(req.user.empresa_id);
+    const interestName = interests.find(i=>String(i.id)===data.filters.interesse)?.titulo || (data.filters.interesse ? 'Interesse não encontrado' : 'Todos');
+    const pdf = await createReportPdf(data,req.user.razao_social,interestName);
+    res.type('application/pdf').attachment(`licitamatch-${data.tipo}-${data.filters.inicio}-${data.filters.fim}.pdf`).send(pdf);
   });
   return router;
 }

@@ -201,15 +201,17 @@ test('cron impede sobreposição e continua após falha; email escapa conteúdo 
 test('email automático usa empresa sem usuários, preserva histórico e limita cada oportunidade a um envio', async () => {
   const db = new PGlite();
   const migrations = await readMigrations();
-  for (const migration of migrations.filter(m => !m.name.startsWith('010_'))) await db.exec(migration.sql);
+  for (const migration of migrations.filter(m => m.name < '010')) await db.exec(migration.sql);
   await db.exec("ALTER TABLE empresas ALTER COLUMN plano SET DEFAULT 'pro'");
   await db.exec(`INSERT INTO empresas (razao_social,cnpj,email) VALUES ('Empresa','11222333000181','empresa@example.test');
     INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo) VALUES (1,'Gestor','usuario@example.test','$2b$12$' || repeat('x',53),'gestor');
     INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Compra',ARRAY['notebook','compra','extra']);`);
-  await persistPncpItems(db,[item]);
-  await correlateOpportunities(db);
+  // Historical fixture uses the schema that existed before company e-mail delivery.
+  await db.query('INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade) VALUES ($1,$2,$3,$4,$5)',
+    [item.id,item.objeto,item.dataAbertura,item.unidadeGestora,item.modalidade]);
+  await db.exec('INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,1,1,67)');
   await db.exec("INSERT INTO alertas (match_id,usuario_id,status,enviado_em) VALUES (1,1,'enviado',now())");
-  await db.exec(migrations.find(m => m.name.startsWith('010_')).sql);
+  for (const migration of migrations.filter(m => m.name >= '010')) await db.exec(migration.sql);
   // New opportunity at exactly 67; company email does not require a user.
   await persistPncpItems(db,[{...item,id:'nova',objeto:'Compra de notebooks novos',unidadeGestora:'Outro órgão'}]);
   await correlateOpportunities(db);

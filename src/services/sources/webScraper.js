@@ -1,4 +1,6 @@
-export async function fetchHtml(fetchImpl, url, name = 'site') {
+import { safeOfficialUrl } from './officialLink.js';
+
+export async function fetchHtml(fetchImpl, url, name = 'site', onPage) {
   const response = await fetchImpl(url, {
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
@@ -17,6 +19,7 @@ export async function fetchHtml(fetchImpl, url, name = 'site') {
     throw new Error(`${name} retornou HTML vazio.`);
   }
 
+  onPage?.(safeOfficialUrl(response.url) || safeOfficialUrl(String(url)));
   return text;
 }
 
@@ -34,7 +37,7 @@ export function parseTextBlocks(html) {
   return sanitized || '';
 }
 
-export function scrapeComprasnetHtml(html) {
+export function scrapeComprasnetHtml(html, pageUrl) {
   const text = parseTextBlocks(html);
   if (!text) return [];
 
@@ -74,19 +77,40 @@ export function scrapeComprasnetHtml(html) {
 
   if (!id || !objeto || !unidadeGestora || !dataAbertura || Number.isNaN(Date.parse(dataAbertura))) return [];
 
+  const urlFonte = scrapedOfficialLink(html, pageUrl);
   return [{
     id,
     objeto: objeto.replace(/\s+([.,;:!?])/, '$1').trim(),
     unidadeGestora,
     modalidade: modalidade || 'N/D',
-    dataAbertura
+    dataAbertura,
+    ...(urlFonte ? { urlFonte } : {})
   }];
+}
+
+function scrapedOfficialLink(html, pageUrl) {
+  if (!safeOfficialUrl(pageUrl)) return null;
+  const content = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+  const links = new Set();
+  const decode = text => text.replace(/&amp;/gi, '&').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Math.min(Number(n), 0x10ffff)));
+  for (const anchor of content.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    if (!/(edital|contrata[cç][aã]o|processo|detalhes)/i.test(parseTextBlocks(anchor[2]))) continue;
+    const href = /\bhref\s*=\s*(["'])(.*?)\1/i.exec(anchor[1])?.[2];
+    if (!href || href.startsWith('#')) continue;
+    const url = safeOfficialUrl(decode(href), pageUrl);
+    if (url) links.add(url);
+  }
+  if (links.size === 1) return [...links][0];
+  // Multiple candidate links cannot be safely associated with this record.
+  // This is the page that was actually fetched, not a guessed detail URL.
+  return pageUrl;
 }
 
 export async function scrapeComprasnetFallback({ fetchImpl, baseUrl, page = 1, pageSize = 50 } = {}) {
   const url = new URL(baseUrl);
-  const html = await fetchHtml(fetchImpl, url, 'Portal complementar (scraping)');
-  const items = scrapeComprasnetHtml(html);
+  let pageUrl;
+  const html = await fetchHtml(fetchImpl, url, 'Portal complementar (scraping)', value => { pageUrl = value; });
+  const items = scrapeComprasnetHtml(html, pageUrl);
   if (!items.length) {
     throw new Error('Scraping do portal complementar não encontrou registros válidos.');
   }

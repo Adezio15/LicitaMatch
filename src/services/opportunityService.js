@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HttpError } from '../utils/httpError.js';
 import { matchLicitacao } from './matchesService.js';
 import { normalizeWhatsAppNumber } from './whatsappService.js';
+import { states } from '../utils/validation.js';
 
 const flag = z.union([z.boolean(), z.enum(['true', 'false'])]).transform(v => v === true || v === 'true');
 export const interestSchema = z.object({
@@ -27,6 +28,8 @@ export const whatsappPreferenceSchema = z.object({
   }
 });
 export const filterSchema = z.object({
+  uf: z.union([z.enum(states), z.literal(''), z.array(z.enum(states)).max(27)])
+    .default([]).transform(value => [...new Set((Array.isArray(value) ? value : [value]).filter(Boolean))]),
   segmento: z.string().regex(/^[1-9][0-9]{0,17}$/).or(z.literal('')).default(''),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   status: z.enum(['', 'novo', 'revisado', 'aceito', 'recusado']).default(''),
@@ -85,18 +88,21 @@ export function opportunityService(database) {
     async search(empresaId, filters) {
       if (await companyPlan(database, empresaId) === 'sem_plano') return this.summary(empresaId);
       const where = `FROM licitacoes_pncp l WHERE licitacao_permitida(l.modalidade,l.uf)
+        AND (cardinality($4::text[])=0 OR l.uf=ANY($4::text[]))
         AND ($2='' OR strpos(lower(l.objeto),lower($2))>0)
         AND EXISTS (SELECT 1 FROM interesses i, unnest(i.palavras) palavra
           WHERE i.empresa_id=$1 AND i.ativo=true AND ($3::bigint IS NULL OR i.id=$3)
           AND strpos(lower(l.objeto),lower(palavra))>0)`;
-      const values = [empresaId, filters.q, filters.segmento || null];
+      const values = [empresaId, filters.q, filters.segmento || null, filters.uf || []];
       const total = (await database.query(`SELECT count(*)::int AS total ${where}`, values)).rows[0].total;
-      const items = (await database.query(`SELECT l.id,l.objeto,l.modalidade,l.uf,l.origem,l.link_edital,l.unidade_gestora,l.codigo_externo,l.data_abertura ${where} ORDER BY l.id DESC LIMIT 20 OFFSET $4`, [...values,(filters.page-1)*20])).rows;
+      const items = (await database.query(`SELECT l.id,l.objeto,l.modalidade,l.uf,l.origem,
+        l.link_edital,l.url_fonte,l.cidade,l.unidade_gestora,l.codigo_externo,l.data_abertura
+        ${where} ORDER BY l.id DESC LIMIT 20 OFFSET $5`, [...values,(filters.page-1)*20])).rows;
       return { items, total, pages: Math.max(1,Math.ceil(total/20)), filters };
     },
     async detail(empresaId,id) {
       assertOpportunityAccess(await companyPlan(database,empresaId));
-      const item = (await database.query(`SELECT l.id,l.objeto,l.modalidade,l.uf,l.origem,l.link_edital,l.unidade_gestora,l.codigo_externo,l.data_abertura
+      const item = (await database.query(`SELECT l.id,l.objeto,l.modalidade,l.uf,l.origem,l.link_edital,l.url_fonte,l.cidade,l.unidade_gestora,l.codigo_externo,l.data_abertura
         FROM licitacoes_pncp l WHERE l.id=$2 AND licitacao_permitida(l.modalidade,l.uf)
         AND EXISTS (SELECT 1 FROM interesses i,unnest(i.palavras) palavra
           WHERE i.empresa_id=$1 AND i.ativo=true AND strpos(lower(l.objeto),lower(palavra))>0)`,[empresaId,id])).rows[0];
@@ -125,16 +131,17 @@ export function opportunityService(database) {
     },
     async list(empresaId, filters) {
       assertFeature(await companyPlan(database, empresaId), 'match');
-      const values = [empresaId,filters.status,filters.q,filters.score];
+      const values = [empresaId,filters.status,filters.q,filters.score,filters.uf || []];
       const where = `m.empresa_id=$1 AND i.empresa_id=$1 AND i.ativo=true
         AND ($2='' OR m.status=$2) AND ($3='' OR strpos(lower(l.objeto),lower($3))>0)
-        AND m.score > 0 AND m.score >= $4 AND licitacao_permitida(l.modalidade,l.uf)`;
+        AND m.score > 0 AND m.score >= $4 AND licitacao_permitida(l.modalidade,l.uf)
+        AND (cardinality($5::text[])=0 OR l.uf=ANY($5::text[]))`;
       const from = `FROM matches m JOIN interesses i ON i.id=m.interesse_id
         JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE ${where}`;
       const total = (await database.query(`SELECT count(*)::int AS total ${from}`, values)).rows[0].total;
       const { rows } = await database.query(`SELECT m.id,m.score,m.status,i.titulo AS interesse_titulo,
-        l.codigo_externo,l.objeto,l.data_abertura,l.unidade_gestora,l.modalidade,l.origem,l.uf,l.link_edital,
-        m.id AS match_id ${from} ORDER BY m.score DESC,m.id DESC LIMIT 20 OFFSET $5`, [...values,(filters.page-1)*20]);
+        l.codigo_externo,l.objeto,l.data_abertura,l.unidade_gestora,l.modalidade,l.origem,l.uf,l.link_edital,l.url_fonte,l.cidade,
+        m.id AS match_id ${from} ORDER BY m.score DESC,m.id DESC LIMIT 20 OFFSET $6`, [...values,(filters.page-1)*20]);
       return { items: rows, total, pages: Math.max(1,Math.ceil(total/20)), filters };
     },
     async updateStatus(empresaId, id, status) {

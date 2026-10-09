@@ -1,0 +1,9 @@
+<fieldset>
+  <legend>Estados da busca</legend>
+  <p class="muted">Selecione um ou mais estados. Sem seleção, a busca considera todos.</p>
+  <div class="grid two">
+    <% for (const state of states) { %>
+      <label><input type="checkbox" name="uf" value="<%= state %>" <%= (filters.uf || []).includes(state) ? 'checked' : '' %>> <%= state %></label>
+    <% } %>
+  </div>
+</fieldset>

@@ -15,6 +15,8 @@
 .dashboard-shell>.page{width:100%;max-width:none;margin:0;padding:0;min-width:0}
 @media(max-width:900px){.dashboard-shell>.sidebar{position:static;max-height:none}.sidebar-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.dashboard-shell{padding:0 16px;margin:16px auto;gap:16px}}
+
+.report-tabs{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.report-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;align-items:end}
 dialog{width:min(960px,94vw);max-height:90dvh;overflow:auto;border:1px solid var(--line);border-radius:20px;padding:32px;color:var(--ink)}dialog::backdrop{background:#102b40aa;backdrop-filter:blur(3px)}.plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.plan-grid .panel{padding:22px;display:flex;flex-direction:column}.plan-grid form{margin-top:auto}.featured-plan{border:2px solid var(--teal);background:#f0faf8}.quick-actions{display:flex;flex-wrap:wrap;gap:12px}button:disabled{opacity:.65;cursor:default}@media(max-width:650px){.plan-grid{grid-template-columns:1fr}dialog{padding:20px}}
 .dashboard-page .stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .header-chip{overflow-wrap:anywhere;max-width:100%}
