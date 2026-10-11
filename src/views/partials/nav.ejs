@@ -14,4 +14,5 @@
     </nav>
     <div class="sidebar-card"><p>Plano <%= { sem_plano:'Sem plano', start: 'Start', pro: 'Pro', premium: 'Premium' }[user.plano] %></p><h3><%= user.nome_fantasia || user.razao_social || 'Sua empresa' %></h3><p><%= { usuario:'Usuário', gestor:'Gestor', admin:'Administrador' }[user.tipo] %></p></div>
     <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button secondary" type="submit">Sair</button></form>
+    <img class="sidebar-favsystem-logo" src="/assets/favsystem-logo.png" alt="FAVSYSTEM">
   </aside>
