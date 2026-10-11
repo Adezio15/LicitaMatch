@@ -128,11 +128,11 @@ test('persisted matches trigger Brevo immediately, cross 67, log skips and dedup
     await persistPncpItems(database, [item]);
     await worker.correlate(1);
     assert.equal(payloads.length, 0);
-    assert.ok(logs.some(x => x.event === 'match.created' && x.score === 50));
-    assert.ok(logs.some(x => x.event === 'automatic.alert.skipped' && x.reason === 'score_abaixo_do_limite'));
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM matches WHERE empresa_id=1')).rows[0].n, 0);
+    assert.ok(!logs.some(x => x.event === 'match.created' && x.score === 50));
     await db.exec("UPDATE interesses SET palavras=ARRAY['notebook','compra','extra'] WHERE empresa_id=1");
     await worker.correlate(1);
-    assert.equal(payloads.length, 1, 'score update crossing 67 sends before correlation returns');
+    assert.equal(payloads.length, 1, 'first qualifying score sends before correlation returns');
     assert.equal(payloads[0].to[0].email, 'first@example.test');
     const created = logs.findIndex(x => x.event === 'match.created' && x.score === 67);
     const started = logs.findIndex(x => x.event === 'automatic.alert.start');

@@ -24,7 +24,7 @@ test('fontes preservam UF e distinguem IDs PNCP de códigos Compras.gov', () => 
   assert.equal(unknown.uf, undefined);
 });
 
-test('regra regional filtra página, dashboard, novas filas e alertas pendentes nos dois canais', async () => {
+test('modalidades em todas as UFs nas páginas, dashboard e alertas dos dois canais', async () => {
   const db = new PGlite();
   const query = (sql, values) => sql.includes('pg_try_advisory_lock') ? Promise.resolve({ rows: [{ locked: true }] })
     : sql.includes('pg_advisory_unlock') ? Promise.resolve({ rows: [] }) : db.query(sql, values);
@@ -41,9 +41,9 @@ test('regra regional filtra página, dashboard, novas filas e alertas pendentes 
     const cases = [
       ['RN', 'Pregão - Eletrônico', true], ['PB', 'Pregão Presencial', true],
       ['RN', 'Pregão - Presencial', true], ['PB', 'Pregão Eletrônico', true],
-      ['SP', 'Pregão Eletrônico', true], ['PE', 'Pregão Presencial', false],
-      [null, 'Pregão Presencial', false], [null, 'Pregão Eletrônico', true],
-      ['RN', 'Dispensa', false], ['PB', 'Concorrência Eletrônica', false],
+      ['SP', 'Pregão Eletrônico', true], ['PE', 'Pregão Presencial', true],
+      [null, 'Pregão Presencial', true], [null, 'Pregão Eletrônico', true],
+      ['RN', 'Dispensa', true], ['PB', 'Concorrência Eletrônica', false],
       ['RN', 'Pregão', false], ['PB', 'N/D', false]
     ];
     const allowed = [];
@@ -66,9 +66,9 @@ test('regra regional filtra página, dashboard, novas filas e alertas pendentes 
     // A forbidden opportunity already queued must not escape the new rule.
     await db.exec(`INSERT INTO alertas (match_id,usuario_id,canal) SELECT m.id,1,c.canal FROM matches m
       JOIN licitacoes_pncp l ON l.id=m.licitacao_id CROSS JOIN (VALUES ('email'),('whatsapp')) c(canal)
-      WHERE l.codigo_externo='regional-5';
+      WHERE l.codigo_externo='regional-9';
       INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id) SELECT 1,l.id,m.id FROM matches m
-        JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE l.codigo_externo='regional-5';
+        JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE l.codigo_externo='regional-9';
       INSERT INTO tarefas (nome,proxima_execucao) VALUES ('matches',now()+interval '1 day');`);
     const sent = { email: 0, whatsapp: 0 };
     const delivery = channel => ({ sendMatchAlert: async () => { sent[channel]++; return { accepted: true, messageId: 'test' }; } });
@@ -86,7 +86,7 @@ test('regra regional filtra página, dashboard, novas filas e alertas pendentes 
     await persistPncpItems(database, [historical]);
     assert.equal((await db.query("SELECT uf FROM licitacoes_pncp WHERE codigo_externo='regional-6'")).rows[0].uf, 'RN');
     await correlateOpportunities(database);
-    assert.equal((await opportunityService(database).list(1, { page: 1, status: '', q: '', score: 0 })).total, allowed.length + 1);
+    assert.equal((await opportunityService(database).list(1, { page: 1, status: '', q: '', score: 0 })).total, allowed.length);
     // Identical object/unit/date in different states must not be deduplicated together.
     assert.equal(await persistPncpItems(database, [{ ...base, id: 'state-rn', modalidade: 'Pregão Presencial', uf: 'RN' },
       { ...base, id: 'state-pe', modalidade: 'Pregão Presencial', uf: 'PE' }]), 2);

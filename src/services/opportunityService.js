@@ -1,7 +1,7 @@
 import { assertFeature, companyPlan, assertOpportunityAccess } from './planService.js';
 import { z } from 'zod';
 import { HttpError } from '../utils/httpError.js';
-import { matchLicitacao } from './matchesService.js';
+import { matchLicitacao, MIN_MATCH_SCORE } from './matchesService.js';
 import { normalizeWhatsAppNumber } from './whatsappService.js';
 import { states } from '../utils/validation.js';
 
@@ -30,6 +30,7 @@ export const whatsappPreferenceSchema = z.object({
 export const filterSchema = z.object({
   uf: z.union([z.enum(states), z.literal(''), z.array(z.enum(states)).max(27)])
     .default([]).transform(value => [...new Set((Array.isArray(value) ? value : [value]).filter(Boolean))]),
+  modalidade: z.enum(['', 'pregao eletronico', 'pregao presencial', 'dispensa']).default(''),
   segmento: z.string().regex(/^[1-9][0-9]{0,17}$/).or(z.literal('')).default(''),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   status: z.enum(['', 'novo', 'revisado', 'aceito', 'recusado']).default(''),
@@ -52,11 +53,13 @@ export async function correlateOpportunities(database, empresaId = null, logger,
     found += rows.length;
     for (const item of rows) for (const interest of interests) {
       const score = item.permitida ? matchLicitacao(item, interest) : 0;
-      if (score >= 67) qualified.add(item.id);
+      // Invalidate historical matches that no longer correlate without creating new low-score rows.
       if (!score) {
         await database.query('UPDATE matches SET score=0 WHERE interesse_id=$1 AND licitacao_id=$2 AND empresa_id=$3 AND score<>0', [interest.id,item.id,interest.empresa_id]);
         continue;
       }
+      if (score < MIN_MATCH_SCORE) continue;
+      qualified.add(item.id);
       const result = await database.query(`INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score)
         SELECT id,$2,empresa_id,$3 FROM interesses WHERE id=$1 AND empresa_id=$4 AND ativo=true
         ON CONFLICT (interesse_id,licitacao_id) DO UPDATE SET score=EXCLUDED.score
@@ -89,15 +92,16 @@ export function opportunityService(database) {
       if (await companyPlan(database, empresaId) === 'sem_plano') return this.summary(empresaId);
       const where = `FROM licitacoes_pncp l WHERE licitacao_permitida(l.modalidade,l.uf)
         AND (cardinality($4::text[])=0 OR l.uf=ANY($4::text[]))
+        AND ($5='' OR modalidade_oportunidade(l.modalidade)=$5 OR ($5='dispensa' AND modalidade_oportunidade(l.modalidade)='dispensa de licitacao'))
         AND ($2='' OR strpos(lower(l.objeto),lower($2))>0)
         AND EXISTS (SELECT 1 FROM interesses i, unnest(i.palavras) palavra
           WHERE i.empresa_id=$1 AND i.ativo=true AND ($3::bigint IS NULL OR i.id=$3)
           AND strpos(lower(l.objeto),lower(palavra))>0)`;
-      const values = [empresaId, filters.q, filters.segmento || null, filters.uf || []];
+      const values = [empresaId, filters.q, filters.segmento || null, filters.uf || [], filters.modalidade || ''];
       const total = (await database.query(`SELECT count(*)::int AS total ${where}`, values)).rows[0].total;
       const items = (await database.query(`SELECT l.id,l.objeto,l.modalidade,l.uf,l.origem,
         l.link_edital,l.url_fonte,l.cidade,l.unidade_gestora,l.codigo_externo,l.data_abertura
-        ${where} ORDER BY l.id DESC LIMIT 20 OFFSET $5`, [...values,(filters.page-1)*20])).rows;
+        ${where} ORDER BY l.id DESC LIMIT 20 OFFSET $6`, [...values,(filters.page-1)*20])).rows;
       return { items, total, pages: Math.max(1,Math.ceil(total/20)), filters };
     },
     async detail(empresaId,id) {
@@ -131,17 +135,18 @@ export function opportunityService(database) {
     },
     async list(empresaId, filters) {
       assertFeature(await companyPlan(database, empresaId), 'match');
-      const values = [empresaId,filters.status,filters.q,filters.score,filters.uf || []];
+      const values = [empresaId,filters.status,filters.q,filters.score,filters.uf || [],filters.modalidade || ''];
       const where = `m.empresa_id=$1 AND i.empresa_id=$1 AND i.ativo=true
         AND ($2='' OR m.status=$2) AND ($3='' OR strpos(lower(l.objeto),lower($3))>0)
         AND m.score > 0 AND m.score >= $4 AND licitacao_permitida(l.modalidade,l.uf)
-        AND (cardinality($5::text[])=0 OR l.uf=ANY($5::text[]))`;
+        AND (cardinality($5::text[])=0 OR l.uf=ANY($5::text[]))
+        AND ($6='' OR modalidade_oportunidade(l.modalidade)=$6 OR ($6='dispensa' AND modalidade_oportunidade(l.modalidade)='dispensa de licitacao'))`;
       const from = `FROM matches m JOIN interesses i ON i.id=m.interesse_id
         JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE ${where}`;
       const total = (await database.query(`SELECT count(*)::int AS total ${from}`, values)).rows[0].total;
       const { rows } = await database.query(`SELECT m.id,m.score,m.status,i.titulo AS interesse_titulo,
         l.codigo_externo,l.objeto,l.data_abertura,l.unidade_gestora,l.modalidade,l.origem,l.uf,l.link_edital,l.url_fonte,l.cidade,
-        m.id AS match_id ${from} ORDER BY m.score DESC,m.id DESC LIMIT 20 OFFSET $6`, [...values,(filters.page-1)*20]);
+        m.id AS match_id ${from} ORDER BY m.score DESC,m.id DESC LIMIT 20 OFFSET $7`, [...values,(filters.page-1)*20]);
       return { items: rows, total, pages: Math.max(1,Math.ceil(total/20)), filters };
     },
     async updateStatus(empresaId, id, status) {

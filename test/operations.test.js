@@ -54,7 +54,7 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     await request(app).get('/api/interesses').expect(401);
     const first = await register(a,'a@example.test','11222333000181');
     const second = await register(b,'b@example.test','11444777000161');
-    const data = {titulo:'Informática',palavras:'notebook, computador',ativo:true};
+    const data = {titulo:'Informática',palavras:'notebook, compra, computador',ativo:true};
     await a.post('/api/interesses').send(data).expect(403);
     await a.post('/api/interesses').set('X-CSRF-Token',first.csrfToken).send({...data,empresa_id:second.company.id}).expect(422);
     await a.post('/api/interesses').set('X-CSRF-Token',first.csrfToken).send({...data,palavras:'ti'}).expect(422);

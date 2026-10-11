@@ -1,9 +1,13 @@
-<fieldset>
-  <legend>Estados da busca</legend>
-  <p class="muted">Selecione um ou mais estados. Sem seleção, a busca considera todos.</p>
-  <div class="grid two">
-    <% for (const state of states) { %>
-      <label><input type="checkbox" name="uf" value="<%= state %>" <%= (filters.uf || []).includes(state) ? 'checked' : '' %>> <%= state %></label>
-    <% } %>
-  </div>
+<% const stateNames = { AC:'Acre', AL:'Alagoas', AP:'Amapá', AM:'Amazonas', BA:'Bahia', CE:'Ceará', DF:'Distrito Federal', ES:'Espírito Santo', GO:'Goiás', MA:'Maranhão', MT:'Mato Grosso', MS:'Mato Grosso do Sul', MG:'Minas Gerais', PA:'Pará', PB:'Paraíba', PR:'Paraná', PE:'Pernambuco', PI:'Piauí', RJ:'Rio de Janeiro', RN:'Rio Grande do Norte', RS:'Rio Grande do Sul', RO:'Rondônia', RR:'Roraima', SC:'Santa Catarina', SP:'São Paulo', SE:'Sergipe', TO:'Tocantins' }; %>
+<fieldset class="uf-filter" data-uf-filter>
+  <legend>UFs</legend>
+  <details class="uf-select">
+    <summary><span data-uf-summary>Selecione</span><span aria-hidden="true" class="uf-arrow">?</span></summary>
+    <div class="uf-options">
+      <% for (const state of [...states].sort()) { %>
+        <label class="uf-option"><input type="checkbox" name="uf" value="<%= state %>" <%= (filters.uf || []).includes(state) ? 'checked' : '' %>><span><%= state %> - <%= stateNames[state] %></span></label>
+      <% } %>
+    </div>
+  </details>
+  <small class="muted">Sem seleção, a busca considera todas as UFs.</small>
 </fieldset>

@@ -61,7 +61,31 @@ test('search and opportunities filter states before counting and pagination', as
         items: [], total: 21, pages: 2, filters: filterSchema.parse({ uf: ['RN', 'PB'] })
       });
       assert.match(html, /name="uf" value="RN" checked/);
-      assert.match(html, /uf=RN&amp;uf=PB&amp;page=2/);
+      assert.match(html, /uf=RN&amp;uf=PB&amp;modalidade=&amp;page=2/);
+    }
+  } finally { await db.close(); }
+});
+
+test('modality filters combine with UF in search and matches', async () => {
+  assert.equal(filterSchema.safeParse({modalidade:'invalid'}).success, false);
+  const db = new PGlite();
+  try {
+    for (const migration of await readMigrations()) await db.exec(migration.sql);
+    await db.exec(`INSERT INTO empresas (razao_social,cnpj,email,plano) VALUES ('Empresa','11222333000181','modal@example.test','premium');
+      INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Notebooks',ARRAY['notebook']);
+      INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,uf) VALUES
+      ('M1','Notebook 1',now(),'Secretaria','Pregão - Presencial','SP'),
+      ('M2','Notebook 2',now(),'Secretaria','Pregão Eletrônico','SP'),
+      ('M3','Notebook 3',now(),'Secretaria','Dispensa de Licitação','SP'),
+      ('M4','Notebook 4',now(),'Secretaria','Dispensa','PB');
+      INSERT INTO matches (empresa_id,interesse_id,licitacao_id,score) SELECT 1,1,id,100 FROM licitacoes_pncp;`);
+    for (const method of ['search','list']) {
+      for (const [modalidade, code] of [['pregao presencial','M1'],['pregao eletronico','M2'],['dispensa','M3']]) {
+        const result = await opportunityService(db)[method](1, filterSchema.parse({uf:'SP',modalidade}));
+        assert.equal(result.total,1);
+        assert.equal(result.items[0].codigo_externo,code);
+      }
+      assert.equal((await opportunityService(db)[method](1,filterSchema.parse({modalidade:'dispensa'}))).total,2);
     }
   } finally { await db.close(); }
 });

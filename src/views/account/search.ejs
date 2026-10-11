@@ -7,6 +7,7 @@
   <% const stateQuery = (filters.uf || []).map(uf => '&uf=' + encodeURIComponent(uf)).join(''); %>
   <form method="get" class="panel grid two">
     <%- include('../partials/stateFilter', { states, filters }) %>
+    <%- include('../partials/modalityFilter', { filters }) %>
     <label>Buscar no objeto<input name="q" maxlength="150" value="<%= filters.q %>"></label>
     <label>Segmento / interesse<select name="segmento"><option value="">Todos os interesses ativos</option>
       <% for (const interest of interests.filter(i => i.ativo)) { %><option value="<%= interest.id %>" <%= String(interest.id) === filters.segmento ? 'selected' : '' %>><%= interest.titulo %></option><% } %>
@@ -20,9 +21,10 @@
   <% } %>
   <% if (!items.length) { %><p>Nenhuma oportunidade encontrada. Revise os interesses e filtros.</p><% } %>
   <nav aria-label="Paginação" class="section-gap">
-    <% if (filters.page > 1) { %><a href="?<%= stateQuery.slice(1) %>&amp;page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;segmento=<%= filters.segmento %>">Anterior</a><% } %>
+    <% if (filters.page > 1) { %><a href="?<%= stateQuery.slice(1) %>&amp;modalidade=<%= encodeURIComponent(filters.modalidade || '') %>&amp;page=<%= filters.page-1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;segmento=<%= filters.segmento %>">Anterior</a><% } %>
     Página <%= filters.page %> de <%= pages %>
-    <% if (filters.page < pages) { %><a href="?<%= stateQuery.slice(1) %>&amp;page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;segmento=<%= filters.segmento %>">Próxima</a><% } %>
+    <% if (filters.page < pages) { %><a href="?<%= stateQuery.slice(1) %>&amp;modalidade=<%= encodeURIComponent(filters.modalidade || '') %>&amp;page=<%= filters.page+1 %>&amp;q=<%= encodeURIComponent(filters.q) %>&amp;segmento=<%= filters.segmento %>">Próxima</a><% } %>
   </nav>
 </main></div>
+<script src="/assets/opportunity-filters.js" defer></script>
 <%- include('../partials/footer') %>

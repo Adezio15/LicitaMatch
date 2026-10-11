@@ -1,0 +1,7 @@
+<label>Modalidade
+  <select name="modalidade">
+    <% for (const [value, label] of Object.entries({ '': 'Todas', 'pregao eletronico': 'Pregão eletrônico', 'pregao presencial': 'Pregão presencial', dispensa: 'Dispensa' })) { %>
+      <option value="<%= value %>" <%= filters.modalidade === value ? 'selected' : '' %>><%= label %></option>
+    <% } %>
+  </select>
+</label>

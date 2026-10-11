@@ -1,3 +1,5 @@
+export const MIN_MATCH_SCORE = 67;
+
 function normalizeText(value) {
   return String(value || '')
     .toLowerCase()
@@ -58,6 +60,8 @@ export async function saveMatches(database, payload = {}) {
     modalidade: licitacao.modalidade,
     unidadeGestora: licitacao.unidadeGestora
   }, { palavras: payload.palavras || [], titulo: payload.titulo || '' });
+
+  if (score < MIN_MATCH_SCORE) return 0;
 
   const { rowCount } = await database.query(`INSERT INTO matches (interesse_id, licitacao_id, empresa_id, score, status)
     VALUES ($1, $2, $3, $4, 'novo')
