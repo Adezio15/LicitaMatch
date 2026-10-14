@@ -31,6 +31,12 @@ async function fixture() {
 }
 test('configuração é explícita e produção exige aprovação e template',()=>{
  assert.equal(parseEnv({...base,...config,WHATSAPP_ENABLED:undefined}).WHATSAPP_ENABLED,'false');
+ assert.equal(parseEnv({...base,...config}).WHATSAPP_SANDBOX_TEST_ENABLED,'false');
+ const controlled={...base,...config,WHATSAPP_ENABLED:'false',WHATSAPP_PRODUCTION_READY:'false',WHATSAPP_SANDBOX_TEST_ENABLED:'true'};
+ assert.equal(parseEnv(controlled).WHATSAPP_ENABLED,'false');
+ for(const overrides of [{WHATSAPP_ENABLED:'true'},{WHATSAPP_PRODUCTION_READY:'true'},{WHATSAPP_MODE:'production'}])
+  assert.throws(()=>parseEnv({...controlled,...overrides}),/SANDBOX_TEST_REQUIRES_DISABLED_PRODUCTION/);
+ assert.throws(()=>parseEnv({...controlled,TWILIO_AUTH_TOKEN:undefined}),/TWILIO_AUTH_TOKEN/);
  assert.equal(parseEnv({...base,...config}).WHATSAPP_MODE,'sandbox');
  assert.equal(parseEnv({...base,...config,WHATSAPP_WEBHOOK_ENABLED:undefined}).WHATSAPP_WEBHOOK_ENABLED,'false');
  assert.throws(()=>parseEnv({...base,WHATSAPP_WEBHOOK_ENABLED:'true'}),/TWILIO_ACCOUNT_SID/);
@@ -188,7 +194,7 @@ test('rejeição definitiva é registrada sem repetir e histórico anterior impe
   await sendWhatsAppAlerts({client:database,config,service,logger});
   assert.deepEqual((await db.query('SELECT status,erro_codigo FROM alertas_empresa_whatsapp')).rows,[{status:'falhou',erro_codigo:63016}]);
   await sendWhatsAppAlerts({client:database,config,service,logger});assert.equal(calls,1);
-  await db.exec("DELETE FROM alertas_empresa_whatsapp; INSERT INTO alertas (match_id,usuario_id,canal,status,provedor_mensagem_id) VALUES (1,1,'whatsapp','enviado','legacy-id'),(1,1,'email','enviado','email-id'); DROP TABLE alertas_empresa_whatsapp; DROP TABLE whatsapp_inbound;");
+  await db.exec("DELETE FROM alertas_empresa_whatsapp; INSERT INTO alertas (match_id,usuario_id,canal,status,provedor_mensagem_id) VALUES (1,1,'whatsapp','enviado','legacy-id'),(1,1,'email','enviado','email-id'); DROP TABLE whatsapp_sandbox_test; DROP TABLE alertas_empresa_whatsapp; DROP TABLE whatsapp_inbound;");
   const migration=(await readMigrations()).find(m=>m.name==='017_twilio_whatsapp.sql');
   await db.exec(migration.sql);
   assert.deepEqual((await db.query('SELECT status,provedor_mensagem_id FROM alertas_empresa_whatsapp')).rows,[{status:'enviado',provedor_mensagem_id:'legacy-id'}]);
@@ -349,4 +355,77 @@ test('número com oito dígitos exige lista e cadastro exatos, consentimento e e
    assert.throws(()=>parseEnv({...base,...config,WHATSAPP_SANDBOX_NUMBERS:invalid}));
   }
  } finally {await app.locals.sessionStore.close();await db.close();}
+});
+
+test('teste administrativo exige confirmação, autorização e permite uma única tentativa',async()=>{
+ const {runSandboxTest}=await import('../src/services/whatsappSandboxTestService.js');
+ const {db}=await fixture();
+ const cfg={...config,WHATSAPP_ENABLED:'false',WHATSAPP_PRODUCTION_READY:'false',WHATSAPP_SANDBOX_TEST_ENABLED:'true'};
+ const options={empresaId:'1',usuarioId:'1'};
+ let calls=0;
+ const recipients=[];
+ const provider={messages:{create:async message=>{calls++;recipients.push(message);return {sid};}}};
+ try {
+  await assert.rejects(runSandboxTest(db,cfg,options,provider),/24 horas/);
+  await db.query('INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ($1,$2)',[sid,payload.to]);
+  await db.exec("INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo,whatsapp_numero,alertas_whatsapp,whatsapp_consentimento_em) VALUES (1,'Outro gestor','other@example.test','$2b$12$'||repeat('x',53),'gestor','+5584999999998',true,now()); INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ('SM'||repeat('2',32),'+5584999999998'); INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,cidade,uf,url_fonte) VALUES ('WA-OTHER','Outro objeto',now(),'Outro órgão','Pregão Eletrônico','Natal','RN','https://pncp.gov.br/app/editais/456'); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,2,1,67);");
+  const preview=await runSandboxTest(db,cfg,options,provider);
+  assert.equal(calls,0);
+  const byEmail={empresaId:'1',email:' A@EXAMPLE.TEST '};
+  assert.equal((await runSandboxTest(db,cfg,byEmail,provider)).confirmation,preview.confirmation);
+  await assert.rejects(runSandboxTest(db,cfg,{empresaId:'2',email:'a@example.test'},provider),/conta única/);
+  await assert.rejects(runSandboxTest(db,cfg,{...options,email:'a@example.test'},provider),/exclusivamente/);
+  await assert.rejects(runSandboxTest(db,cfg,{empresaId:'1',email:'invalid'},provider),/válido/);
+  await assert.rejects(runSandboxTest(db,cfg,{...options,confirmation:'invalid'},provider),/Confirmação/);
+  await assert.rejects(runSandboxTest(db,{...cfg,WHATSAPP_SANDBOX_TEST_ENABLED:'false'},{...options,confirmation:preview.confirmation},provider),/Ative/);
+  await db.query('UPDATE usuarios SET alertas_whatsapp=false');
+  await assert.rejects(runSandboxTest(db,cfg,{...options,confirmation:preview.confirmation},provider),/elegível/);
+  await db.query('UPDATE usuarios SET alertas_whatsapp=true');
+  assert.equal((await runSandboxTest(db,cfg,{...byEmail,confirmation:preview.confirmation},provider)).accepted,true);
+  await assert.rejects(runSandboxTest(db,cfg,{...options,confirmation:preview.confirmation},provider));
+  assert.equal(calls,1);
+  assert.equal(recipients[0].to,'whatsapp:'+payload.to);
+  for(const text of ['Secretaria','Compra de notebooks','Natal/RN','67%',payload.item.urlFonte]) assert.ok(recipients[0].body.includes(text));
+  // Even another eligible opportunity/user in the allowlist cannot reserve a second test.
+  await assert.rejects(runSandboxTest(db,cfg,{empresaId:'1',usuarioId:'2'} ,provider),/elegível/);
+  const expanded={...cfg,WHATSAPP_SANDBOX_NUMBERS:cfg.WHATSAPP_SANDBOX_NUMBERS+',+5584999999998'};
+  const other=await runSandboxTest(db,expanded,{empresaId:'1',usuarioId:'2'},provider);
+  await assert.rejects(runSandboxTest(db,expanded,{empresaId:'1',usuarioId:'2',confirmation:other.confirmation},provider),/já reservado/);
+  assert.equal(calls,1);
+  assert.equal((await db.query('SELECT status FROM alertas_empresa_whatsapp')).rows[0].status,'enviado');
+ } finally {await db.close();}
+});
+
+test('teste administrativo mantém reserva após rejeição, timeout e falha de persistência',async()=>{
+ const {runSandboxTest}=await import('../src/services/whatsappSandboxTestService.js');
+ const {db}=await fixture();
+ const cfg={...config,WHATSAPP_ENABLED:'false',WHATSAPP_PRODUCTION_READY:'false',WHATSAPP_SANDBOX_TEST_ENABLED:'true'};
+ const options={empresaId:'1',usuarioId:'1'};
+ let calls=0;
+ try {
+  await db.query('INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ($1,$2)',[sid,payload.to]);
+  for(const kind of ['rejeicao','timeout','persistencia']) {
+   // Reset only this isolated in-memory fixture to exercise independent failure paths.
+   await db.exec('DELETE FROM whatsapp_sandbox_test; DELETE FROM alertas_empresa_whatsapp;');
+   const preview=await runSandboxTest(db,cfg,options);
+   const provider={messages:{create:async()=>{
+    calls++;
+    if(kind==='rejeicao') throw Object.assign(new Error('private token'),{status:400,code:63016});
+    if(kind==='timeout') throw new Error('private token');
+    return {sid};
+   }}};
+   const client={query:(sql,values)=>{
+    if(kind==='persistencia' && sql.startsWith("UPDATE alertas_empresa_whatsapp SET status='enviado'")) throw new Error('Persistence unavailable');
+    return db.query(sql,values);
+   }};
+   await assert.rejects(runSandboxTest(client,cfg,{...options,confirmation:preview.confirmation},provider));
+   const row=(await db.query('SELECT status,erro_codigo FROM alertas_empresa_whatsapp')).rows[0];
+   assert.equal(row.status,{rejeicao:'falhou',timeout:'incerto',persistencia:'enviando'}[kind]);
+   assert.equal(row.erro_codigo,kind==='rejeicao'?63016:null);
+   assert.equal((await db.query('SELECT * FROM whatsapp_sandbox_test')).rows.length,1);
+   const before=calls;
+   await assert.rejects(runSandboxTest(db,cfg,{...options,confirmation:preview.confirmation},provider));
+   assert.equal(calls,before);
+  }
+ } finally {await db.close();}
 });

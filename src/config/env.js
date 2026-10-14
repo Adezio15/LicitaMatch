@@ -59,6 +59,7 @@ const schema = z.object({
   BREVO_API_KEY: z.preprocess(value => typeof value === 'string' && !value.trim() ? undefined : value, z.string().trim().min(1).optional()),
   EMAIL_PROVIDER: z.enum(['smtp','resend','brevo_api']).default('smtp'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
+  WHATSAPP_SANDBOX_TEST_ENABLED: z.enum(['true','false']).default('false'),
   WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
   WHATSAPP_WEBHOOK_ENABLED: z.enum(['true','false']).default('false'),
   TWILIO_ACCOUNT_SID: z.string().regex(/^AC[0-9a-fA-F]{32}$/).optional(),
@@ -102,7 +103,9 @@ const schema = z.object({
   if (config.EMAIL_ENABLED === 'true') for (const field of emailFields(config)) {
     if (!config[field]) ctx.addIssue({ code: 'custom', path: [field], message: 'MISSING' });
   }
-  if (config.WHATSAPP_ENABLED === 'true' || config.WHATSAPP_WEBHOOK_ENABLED === 'true') for (const field of ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) {
+  if (config.WHATSAPP_SANDBOX_TEST_ENABLED === 'true' && (config.WHATSAPP_ENABLED !== 'false' || config.WHATSAPP_PRODUCTION_READY !== 'false' || config.WHATSAPP_MODE !== 'sandbox'))
+    ctx.addIssue({code:'custom',path:['WHATSAPP_SANDBOX_TEST_ENABLED'],message:'SANDBOX_TEST_REQUIRES_DISABLED_PRODUCTION'});
+  if (config.WHATSAPP_ENABLED === 'true' || config.WHATSAPP_WEBHOOK_ENABLED === 'true' || config.WHATSAPP_SANDBOX_TEST_ENABLED === 'true') for (const field of ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) {
     if (!config[field]) ctx.addIssue({code:'custom',path:[field],message:'MISSING'});
   }
 }).refine(config => config.NODE_ENV !== 'production' || config.LOCAL_DATABASE === 'false', {

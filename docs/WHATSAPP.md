@@ -134,3 +134,32 @@ Quando reason=sender_invalid, o campo senderReason identifica a causa sem expor 
 A migration 018_whatsapp_number_formats.sql permite cadastrar a representação com oito dígitos sem alterar registros existentes. Deve ser aplicada pelo processo habitual antes do teste; não foi aplicada no Railway nesta alteração. Para evitar associação ambígua, não há equivalência automática entre oito e nove dígitos: o From, WHATSAPP_SANDBOX_NUMBERS e o número salvo na conta com consentimento devem corresponder exatamente. Se a representação mudar, o responsável deve salvar a nova preferência e confirmar novamente o consentimento. Somente receber uma mensagem não altera cadastro ou consentimento.
 
 A regra restrita é compartilhada entre validador, configuração e elegibilidade SQL. Rejeita DDD inexistente, números fixos, país diferente, comprimento incorreto, duplicados e caracteres extras. A migração preserva dados históricos usando NOT VALID: escritas novas são validadas, sem reescrever registros antigos. WHATSAPP_ENABLED=false continua bloqueando todos os alertas automáticos.
+
+## Envio administrativo único de uma licitação real
+
+Aplique a migration 019 pelo fluxo habitual. Mantenha `WHATSAPP_ENABLED=false`,
+`WHATSAPP_PRODUCTION_READY=false` e `WHATSAPP_MODE=sandbox`. O comando não inicia
+servidor, worker nem agendador. Informe explicitamente a empresa de teste por CNPJ ou ID e
+seu gestor/admin por e-mail cadastrado ou ID; a seleção usa matches reais de pelo menos 67%, plano Premium,
+consentimento, preferência ativa, regras regionais e lista do Sandbox.
+
+1. Envie uma mensagem ao Sandbox com o próprio número autorizado. O webhook
+   autorizado precisa registrar essa mensagem em `whatsapp_inbound`.
+2. Execute `npm run whatsapp:test:sandbox -- --empresa ID --usuario ID` para
+   revisar destinatário, oportunidade e token de confirmação. Para a empresa solicitada, use `--cnpj 68.700.104/0001-42` no lugar de `--empresa ID`. Para identificar sua conta sem consultar o ID, substitua `--usuario ID` por `--email seu@email.com`. O e-mail deve identificar uma única conta dentro da empresa selecionada; todas as regras de elegibilidade continuam obrigatórias. A prévia não envia.
+3. Autorize somente o comando com `WHATSAPP_SANDBOX_TEST_ENABLED=true` e execute
+   o comando com `--confirm TOKEN` exibido na prévia.
+4. Confira o SID no Console Twilio e o recebimento no aparelho. Aceitação pela API
+   não significa entrega. Volte `WHATSAPP_SANDBOX_TEST_ENABLED=false` após o teste.
+
+Uma reserva persistente em `whatsapp_sandbox_test` permite uma única tentativa no
+banco, inclusive em execuções concorrentes ou quando o resultado for incerto.
+O histórico normal também impede envio repetido dessa oportunidade. Não apague
+reservas para repetir uma chamada cujo resultado ainda não foi esclarecido.
+
+Fora das 24 horas, o comando bloqueia o alerta e pede nova mensagem recebida.
+O Sandbox aceita apenas seus templates pré-aprovados, que não representam este
+alerta completo; não inserir objeto de licitação em variáveis de templates com
+outra finalidade. Templates personalizados exigem ambiente de produção aprovado.
+O esquema atual não persiste valor estimado; quando ausente, a mensagem omite esse
+campo. O adaptador aceita `valorEstimado` quando disponível.

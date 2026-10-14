@@ -22,7 +22,8 @@
     "db:seed": "node scripts/seed.js",
     "admin:create": "node scripts/create-admin.js",
     "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage"
+    "test:coverage": "node --test --experimental-test-coverage",
+    "whatsapp:test:sandbox": "node scripts/test-whatsapp-sandbox.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -6,10 +6,11 @@ export const WELCOME = 'Olá! Bem-vindo ao LicitaMatch. Em breve você receberá
 export function sandboxAllowed(config, number) {
   return (config.WHATSAPP_SANDBOX_NUMBERS || '').split(',').map(n => n.trim()).includes(number);
 }
-export function createWhatsAppService({ config, client, now = () => Date.now() }) {
+export function createWhatsAppService({ config, client, now = () => Date.now(), sandboxTest = false }) {
   let provider = client;
   return { async sendMatchAlert(payload) {
-    if (config.WHATSAPP_ENABLED !== 'true') throw new Error('WhatsApp desativado.');
+    if (sandboxTest && (config.WHATSAPP_SANDBOX_TEST_ENABLED !== 'true' || config.WHATSAPP_ENABLED !== 'false' || config.WHATSAPP_PRODUCTION_READY !== 'false' || config.WHATSAPP_MODE !== 'sandbox')) throw new Error('Teste Sandbox não autorizado.');
+    if (!sandboxTest && config.WHATSAPP_ENABLED !== 'true') throw new Error('WhatsApp desativado.');
     if (!config.TWILIO_ACCOUNT_SID || !config.TWILIO_AUTH_TOKEN || !config.TWILIO_WHATSAPP_FROM) throw new Error('Twilio não configurada.');
     const to = normalizeWhatsAppNumber(payload.to);
     if (!to) throw new Error('Número obrigatório.');
@@ -24,7 +25,7 @@ export function createWhatsAppService({ config, client, now = () => Date.now() }
       const last = new Date(payload.lastInboundAt).getTime();
       if (!Number.isFinite(last) || last > now() || now()-last >= 86400000) throw new Error('Sandbox exige janela de atendimento ativa.');
       message.body = ['LicitaMatch — oportunidade','Objeto: '+variables['1'],'Órgão: '+variables['2'],
-        'Município/UF: '+city+'/'+uf,'Compatibilidade: '+score+'%',variables['6']].join('\n');
+        'Município/UF: '+city+'/'+uf,...(payload.item?.valorEstimado != null && Number.isFinite(Number(payload.item.valorEstimado)) ? ['Valor estimado: '+new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(payload.item.valorEstimado))] : []),'Compatibilidade: '+score+'%',variables['6']].join('\n');
     } else {
       if (config.WHATSAPP_PRODUCTION_READY !== 'true' || !/^HX[0-9a-fA-F]{32}$/.test(config.TWILIO_WHATSAPP_CONTENT_SID || ''))
         throw new Error('Produção exige remetente aprovado e template configurado.');
