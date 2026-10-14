@@ -21,7 +21,9 @@ Sem `EMAIL_ENABLED` explícito, o canal é ativado quando todas as credenciais d
 
 ## WhatsApp
 
-Configure `WHATSAPP_ENABLED=true`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `WHATSAPP_TEMPLATE_NAME` e `WHATSAPP_TEMPLATE_LANGUAGE=pt_BR`. Sem flag explícita, o canal é ativado quando todas as credenciais estão presentes. O template precisa estar aprovado e ter os parâmetros descritos em [WHATSAPP.md](WHATSAPP.md).
+A integração atual usa Twilio. Para testar somente boas-vindas, configure `WHATSAPP_WEBHOOK_ENABLED=true`, `WHATSAPP_ENABLED=false`, `WHATSAPP_MODE=sandbox` e `WHATSAPP_PRODUCTION_READY=false`, além de `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `WHATSAPP_WEBHOOK_URL` e `WHATSAPP_SANDBOX_NUMBERS`. Os números precisam aderir ao Sandbox. Consulte [WHATSAPP.md](WHATSAPP.md) para configuração e teste.
+
+`WHATSAPP_ENABLED` controla exclusivamente os alertas automáticos e exige ativação explícita. `WHATSAPP_WEBHOOK_ENABLED` controla recebimento e respostas independentemente. Ambas têm padrão `false`. As antigas variáveis da integração Meta não são utilizadas.
 
 O gestor ou administrador precisa salvar o celular e confirmar o recebimento na própria conta. A preferência de e-mail é independente. Não basta ativar a flag de envio sem número e consentimento.
 

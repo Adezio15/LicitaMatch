@@ -59,6 +59,7 @@ const schema = z.object({
   EMAIL_PROVIDER: z.enum(['smtp','resend','brevo_api']).default('smtp'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
   WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
+  WHATSAPP_WEBHOOK_ENABLED: z.enum(['true','false']).default('false'),
   TWILIO_ACCOUNT_SID: z.string().regex(/^AC[0-9a-fA-F]{32}$/).optional(),
   TWILIO_AUTH_TOKEN: z.string().trim().min(1).optional(),
   TWILIO_WHATSAPP_FROM: z.string().regex(/^whatsapp:\+[1-9]\d{7,14}$/).optional(),
@@ -100,7 +101,7 @@ const schema = z.object({
   if (config.EMAIL_ENABLED === 'true') for (const field of emailFields(config)) {
     if (!config[field]) ctx.addIssue({ code: 'custom', path: [field], message: 'MISSING' });
   }
-  if (config.WHATSAPP_ENABLED === 'true') for (const field of ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) {
+  if (config.WHATSAPP_ENABLED === 'true' || config.WHATSAPP_WEBHOOK_ENABLED === 'true') for (const field of ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) {
     if (!config[field]) ctx.addIssue({code:'custom',path:[field],message:'MISSING'});
   }
 }).refine(config => config.NODE_ENV !== 'production' || config.LOCAL_DATABASE === 'false', {

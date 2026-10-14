@@ -22,6 +22,7 @@ test('defaults ativam Compras.gov e aguardam credenciais dos alertas', () => {
   assert.equal(config.COMPRASNET_ENABLED, 'true');
   assert.equal(config.EMAIL_ENABLED, 'false');
   assert.equal(config.WHATSAPP_ENABLED, 'false');
+  assert.equal(config.WHATSAPP_WEBHOOK_ENABLED, 'false');
 });
 
 test('worker exige conexão direta no Neon e SMTP completo quando habilitado', () => {

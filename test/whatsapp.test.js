@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
+import express from 'express';
+import { whatsappRoutes } from '../src/routes/whatsappRoutes.js';
 import twilio from 'twilio';
 import { PGlite } from '@electric-sql/pglite';
 import { createApp } from '../src/app.js';
@@ -15,7 +17,7 @@ import { createLogger } from '../src/utils/logger.js';
 const logger=createLogger('silent');
 const sid='SM'+'1'.repeat(32);
 const config={TWILIO_ACCOUNT_SID:'AC'+'a'.repeat(32),TWILIO_AUTH_TOKEN:'synthetic-token',
- TWILIO_WHATSAPP_FROM:'whatsapp:+14155238886',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'sandbox',
+ TWILIO_WHATSAPP_FROM:'whatsapp:+14155238886',WHATSAPP_ENABLED:'true',WHATSAPP_WEBHOOK_ENABLED:'true',WHATSAPP_MODE:'sandbox',
  WHATSAPP_SANDBOX_NUMBERS:'+5584999999999',WHATSAPP_WEBHOOK_URL:'https://licitamatch.online/api/whatsapp/webhook'};
 const base={DATABASE_URL:'postgresql://test:test@localhost/test',NODE_ENV:'test',SESSION_SECRET:'only-automated-testing-'.repeat(3)};
 const payload={to:'+5584999999999',customer:'Empresa',interestName:'Notebooks',score:67,lastInboundAt:new Date(),
@@ -30,6 +32,12 @@ async function fixture() {
 test('configuração é explícita e produção exige aprovação e template',()=>{
  assert.equal(parseEnv({...base,...config,WHATSAPP_ENABLED:undefined}).WHATSAPP_ENABLED,'false');
  assert.equal(parseEnv({...base,...config}).WHATSAPP_MODE,'sandbox');
+ assert.equal(parseEnv({...base,...config,WHATSAPP_WEBHOOK_ENABLED:undefined}).WHATSAPP_WEBHOOK_ENABLED,'false');
+ assert.throws(()=>parseEnv({...base,WHATSAPP_WEBHOOK_ENABLED:'true'}),/TWILIO_ACCOUNT_SID/);
+ assert.throws(()=>parseEnv({...base,...config,WHATSAPP_WEBHOOK_ENABLED:'invalid'}),/WHATSAPP_WEBHOOK_ENABLED/);
+ const webhookOnly=parseEnv({...base,...config,WHATSAPP_ENABLED:'false'});
+ assert.equal(webhookOnly.WHATSAPP_WEBHOOK_ENABLED,'true');
+ assert.equal(webhookOnly.WHATSAPP_PRODUCTION_READY,'false');
  assert.throws(()=>parseEnv({...base,WHATSAPP_ENABLED:'true'}),/TWILIO_ACCOUNT_SID/);
  assert.throws(()=>parseEnv({...base,...config,WHATSAPP_MODE:'production'}),/PRODUCTION_NOT_READY/);
  assert.throws(()=>parseEnv({...base,WHATSAPP_WEBHOOK_URL:'http://licitamatch.online/api/whatsapp/webhook'}));
@@ -88,12 +96,37 @@ test('webhook real do createApp valida URL pública, assinatura, campos, autoriz
   await request(app).get('/api/empresa').expect(401);
  } finally {await app.locals.sessionStore.close();await db.close();}
 });
+test('Webhook independente responde e registra sem ativar alertas automáticos',async()=>{
+ const {db,database}=await fixture();
+ const webhookConfig=parseEnv({...base,...config,WHATSAPP_ENABLED:'false'});
+ const app=createApp({config:webhookConfig,database,logger});
+ const body={AccountSid:config.TWILIO_ACCOUNT_SID,To:config.TWILIO_WHATSAPP_FROM,From:'whatsapp:'+payload.to,MessageSid:sid,Body:'Olá'};
+ const post=(data=body,signature=twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,config.WHATSAPP_WEBHOOK_URL,data))=>request(app).post('/api/whatsapp/webhook').type('form').set('X-Twilio-Signature',signature).send(data);
+ let calls=0;
+ const service={sendMatchAlert:async()=>{calls++;throw new Error('Não deve enviar');}};
+ const worker=createOperationsService({database,config:{...webhookConfig,EMAIL_ENABLED:'false',SYNC_ENABLED:'false'},logger,registry:createSourceRegistry(),whatsappService:service});
+ try {
+  await post(body,'invalid').expect(403);
+  assert.ok((await post().expect(200)).text.includes('<Message>Olá! Bem-vindo ao LicitaMatch. Em breve você receberá informações sobre oportunidades de licitação.</Message>'));
+  assert.equal((await db.query('SELECT mensagem_id,numero FROM whatsapp_inbound')).rows.length,1);
+  assert.ok(!(await post().expect(200)).text.includes('<Message>'));
+  assert.deepEqual(await sendWhatsAppAlerts({client:database,config:webhookConfig,service,logger}),{sent:0,failed:0});
+  await worker.runOnce();
+  assert.equal(calls,0);
+  assert.equal((await db.query('SELECT * FROM alertas_empresa_whatsapp')).rows.length,0);
+  const outsider={...body,From:'whatsapp:+5584999999998',MessageSid:'SM'+'2'.repeat(32)};
+  assert.ok(!(await post(outsider).expect(200)).text.includes('<Message>'));
+  await db.exec('UPDATE usuarios SET alertas_whatsapp=false,whatsapp_consentimento_em=NULL');
+  assert.ok(!(await post({...body,MessageSid:'SM'+'3'.repeat(32)}).expect(200)).text.includes('<Message>'));
+  assert.equal((await db.query('SELECT * FROM whatsapp_inbound')).rows.length,1);
+ } finally {await worker.stop();await app.locals.sessionStore.close();await db.close();}
+});
 test('webhook desativado, Sandbox não autorizado e falha SQL não enviam resposta',async()=>{
  const {db,database}=await fixture();
  const apps=[];
  const body={AccountSid:config.TWILIO_ACCOUNT_SID,To:config.TWILIO_WHATSAPP_FROM,From:'whatsapp:'+payload.to,MessageSid:sid,Body:'teste'};
  try {
-  for(const overrides of [{WHATSAPP_ENABLED:'false'},{WHATSAPP_SANDBOX_NUMBERS:''}]) {
+  for(const overrides of [{WHATSAPP_WEBHOOK_ENABLED:'false'},{WHATSAPP_WEBHOOK_ENABLED:undefined},{WHATSAPP_SANDBOX_NUMBERS:''}]) {
    const app=createApp({config:parseEnv({...base,...config,...overrides}),database,logger});apps.push(app);
    const result=await request(app).post('/api/whatsapp/webhook').type('form').set('X-Twilio-Signature',twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,config.WHATSAPP_WEBHOOK_URL,body)).send(body).expect(200);
    assert.ok(!result.text.includes('<Message>'));
@@ -163,4 +196,51 @@ test('rejeição definitiva é registrada sem repetir e histórico anterior impe
   assert.equal(calls,1);
   assert.equal((await db.query("SELECT provedor_mensagem_id FROM alertas WHERE canal='email'")).rows[0].provedor_mensagem_id,'email-id');
  }finally{await db.close();}
+});
+
+
+test('diagnósticos do webhook distinguem rejeições sem expor dados sensíveis',async()=>{
+ const logs=[];
+ const audit=Object.fromEntries(['info','warn','error'].map(level=>[level,(data)=>logs.push({level,...data})]));
+ const body={AccountSid:config.TWILIO_ACCOUNT_SID,To:config.TWILIO_WHATSAPP_FROM,From:'whatsapp:'+payload.to,MessageSid:sid,Body:'  Olá + &= % 😃\nmensagem privada  ',FutureParameter:'new + field'};
+ let queries=0;
+ const makeApp=(overrides={},rows=[{id:1}],fail=false)=>{
+  const app=express();
+  app.use((req,res,next)=>{req.id='generated-test-id';next();});
+  app.use(express.urlencoded({extended:false}));
+  app.use(whatsappRoutes({config:{...config,WHATSAPP_ENABLED:'false',...overrides},logger:audit,database:{query:async()=>{queries++;if(fail)throw new Error('private SQL token');return {rows};}}}));
+  return app;
+ };
+ const post=(app,data=body,signature=twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,config.WHATSAPP_WEBHOOK_URL,data),path='/api/whatsapp/webhook')=>request(app).post(path).set('X-Forwarded-Proto','http').set('X-Forwarded-Host','spoofed.example').set('X-Twilio-Signature',signature).type('form').send(data);
+ const check=async(result,status,reason)=>{
+  const response=await result.expect(status);
+  assert.equal(logs.at(-1).reason,reason);
+  assert.equal(logs.at(-1).status,status);
+  assert.equal(logs.at(-1).requestId,'generated-test-id');
+  return response;
+ };
+ const app=makeApp();
+ await check(post(app,body,undefined,'/api/whatsapp/webhook?secret=private-query'),403,'public_url_mismatch');
+ await check(post(app,body,''),403,'signature_missing');
+ await check(post(app,body,'private-signature'),403,'signature_invalid');
+ await check(post(app,body,twilio.getExpectedTwilioSignature('wrong-token',config.WHATSAPP_WEBHOOK_URL,body)),403,'signature_invalid');
+ await check(post(app,body,twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,config.WHATSAPP_WEBHOOK_URL.replace('https:','http:'),body)),403,'signature_invalid');
+ await check(post(app,{...body,Body:'changed'},twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,config.WHATSAPP_WEBHOOK_URL,body)),403,'signature_invalid');
+ await check(post(app,{...body,AccountSid:'AC'+'b'.repeat(32)}),403,'account_sid_mismatch');
+ await check(post(app,{...body,To:'whatsapp:+14155238887'}),403,'recipient_mismatch');
+ for(const From of ['whatsapp:+','whatsapp:+15555555555',['whatsapp:'+payload.to,'whatsapp:'+payload.to]])
+  await check(post(app,{...body,From}),400,'sender_invalid');
+ await check(post(app,{...body,MessageSid:[sid,sid]}),400,'message_sid_invalid');
+ assert.equal(queries,0);
+ assert.ok((await check(post(app),200,'welcome_replied')).text.includes('<Message>'));
+ await check(post(makeApp({WHATSAPP_WEBHOOK_ENABLED:'false'})),200,'webhook_disabled');
+ await check(post(makeApp({WHATSAPP_SANDBOX_NUMBERS:'+5584999999998'})),200,'sandbox_number_not_allowed');
+ await check(post(makeApp({},[])),200,'sender_not_eligible');
+ await check(post(makeApp({},[],true)),503,'database_failure');
+ await check(post(makeApp({TWILIO_AUTH_TOKEN:undefined})),503,'auth_token_missing');
+ await check(request(app).post('/api/whatsapp/webhook').send(body),415,'unsupported_content_type');
+ const queryUrl=config.WHATSAPP_WEBHOOK_URL+'?key=a%2Bb&other=c%20d';
+ await check(post(makeApp({WHATSAPP_WEBHOOK_URL:queryUrl}),body,twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,queryUrl,body),'/api/whatsapp/webhook?key=a%2Bb&other=c%20d'),200,'welcome_replied');
+ const serialized=JSON.stringify(logs);
+ for(const secret of [config.TWILIO_AUTH_TOKEN,config.TWILIO_ACCOUNT_SID,config.TWILIO_WHATSAPP_FROM,payload.to,sid,body.Body,body.FutureParameter,'private-signature','private-query','private SQL token','spoofed.example']) assert.ok(!serialized.includes(secret));
 });

@@ -11,7 +11,8 @@ Cadastre as variáveis no serviço da aplicação, sem versionar credenciais:
 | TWILIO_ACCOUNT_SID | SID AC... da conta/subconta que recebe o webhook |
 | TWILIO_AUTH_TOKEN | Auth Token dessa conta/subconta; nunca API Key secret |
 | TWILIO_WHATSAPP_FROM | whatsapp:+NUMERO do Sandbox mostrado na Twilio |
-| WHATSAPP_ENABLED | false; ativação sempre explícita |
+| WHATSAPP_ENABLED | false; controla somente alertas automáticos |
+| WHATSAPP_WEBHOOK_ENABLED | false por padrão; true para testar recebimento e boas-vindas |
 | WHATSAPP_MODE | sandbox |
 | WHATSAPP_WEBHOOK_URL | https://licitamatch.online/api/whatsapp/webhook |
 | WHATSAPP_SANDBOX_NUMBERS | Números permitidos, separados por vírgulas, como +5584999999999 |
@@ -19,7 +20,7 @@ Cadastre as variáveis no serviço da aplicação, sem versionar credenciais:
 | TWILIO_WHATSAPP_CONTENT_SID | Omitir inicialmente; HX... do conteúdo aprovado na produção |
 | WORKER_ENABLED | true para processar alertas; mantém o comportamento existente |
 
-Não altere EMAIL_ENABLED nem as credenciais de e-mail para testar WhatsApp. As antigas variáveis WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_VERSION, WHATSAPP_TEMPLATE_NAME e WHATSAPP_TEMPLATE_LANGUAGE não são utilizadas pelo novo adaptador. Mesmo com credenciais completas, WHATSAPP_ENABLED permanece false quando omitida.
+Não altere EMAIL_ENABLED nem as credenciais de e-mail para testar WhatsApp. As antigas variáveis WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_VERSION, WHATSAPP_TEMPLATE_NAME e WHATSAPP_TEMPLATE_LANGUAGE não são utilizadas pelo novo adaptador. Mesmo com credenciais completas, WHATSAPP_ENABLED e WHATSAPP_WEBHOOK_ENABLED permanecem false quando omitidas. Cada flag é independente; ativar qualquer uma exige as três credenciais Twilio.
 
 A migration 017_twilio_whatsapp.sql deve ser aplicada pelo processo habitual (npm run db:migrate) antes de ativar a integração. Nenhuma migration foi aplicada no banco Railway por esta implementação.
 
@@ -33,17 +34,19 @@ Método HTTP POST, sem query string. Se precisar de parâmetros na URL, configur
 
 O endpoint aceita application/x-www-form-urlencoded. O SDK valida X-Twilio-Signature usando todos os parâmetros e a URL pública fixa, antes de consultar o banco. Não deriva essa URL de Host, X-Forwarded-Host ou do protocolo interno do Railway. TRUST_PROXY_HOPS mantém sua função existente para sessões/rate limiting; ajuste conforme a topologia real do serviço, sem necessidade de usá-lo para validar a assinatura. AccountSid e To também são conferidos. O webhook é registrado antes das sessões e não exige login nem CSRF.
 
-Com a integração desativada, requisições assinadas recebem TwiML vazio. Credenciais ausentes retornam 503; assinatura inválida retorna 403.
+Com WHATSAPP_WEBHOOK_ENABLED=false, requisições válidas recebem HTTP 200 com TwiML vazio, sem consulta de elegibilidade nem registro de mensagem. Com true, o webhook pode registrar e responder mesmo com WHATSAPP_ENABLED=false. Token ausente retorna 503; assinatura inválida retorna 403; formato diferente de formulário retorna 415. Falhas SQL retornam 503 com log sanitizado.
 
 ## Teste do Sandbox
 
 1. Entre no Sandbox pelo código join mostrado na Twilio.
 2. Use um responsável ativo de empresa autorizada no LicitaMatch. Em Minha conta → Alertas pelo WhatsApp, informe o celular, confirme o consentimento e salve a preferência. Não use automaticamente o telefone cadastral da empresa.
 3. Inclua esse número em WHATSAPP_SANDBOX_NUMBERS.
-4. Depois de aplicar a migration e configurar o webhook, ative WHATSAPP_ENABLED=true mantendo WHATSAPP_MODE=sandbox e WHATSAPP_PRODUCTION_READY=false.
+4. Depois de aplicar a migration e configurar o webhook, ative somente WHATSAPP_WEBHOOK_ENABLED=true. Mantenha WHATSAPP_ENABLED=false, WHATSAPP_MODE=sandbox e WHATSAPP_PRODUCTION_READY=false.
 5. Envie uma mensagem ao Sandbox. A resposta esperada é: “Olá! Bem-vindo ao LicitaMatch. Em breve você receberá informações sobre oportunidades de licitação.”
-6. Uma oportunidade elegível com score mínimo de 67% será enviada pelo worker somente dentro das 24 horas seguintes à mensagem recebida.
-7. Ao concluir, volte WHATSAPP_ENABLED=false.
+6. Confira a resposta e o registro em whatsapp_inbound. Nenhum alerta automático de licitação será enviado com WHATSAPP_ENABLED=false, mesmo que exista oportunidade elegível e janela ativa. Não é necessário alterar WORKER_ENABLED ou configurações de e-mail.
+7. Ao concluir, volte WHATSAPP_WEBHOOK_ENABLED=false; mantenha WHATSAPP_ENABLED=false.
+
+A participação ativa é gerenciada pela Twilio, não por uma lista local de sessões: a aplicação exige chamada assinada, AccountSid e To corretos e o número em WHATSAPP_SANDBOX_NUMBERS; a Twilio permite entrega somente aos participantes do Sandbox associado. A sessão expira após três dias; envie novamente join com o código do seu Sandbox quando necessário. Estar na lista local não substitui a adesão.
 
 A resposta automática exige autorização e consentimento, assim como os alertas. Números fora da lista, sem consentimento ou de empresas sem autorização recebem TwiML vazio. Receber uma mensagem não cria consentimento nem modifica o plano. Repetições do mesmo MessageSid são ignoradas; se a resposta inicial se perder após o registro, uma nova mensagem permite testar novamente.
 
@@ -90,9 +93,32 @@ Erros brutos, tokens, conteúdo e números não são registrados nos logs desta 
 
 npm test
 
-Os testes cobrem SDK simulado, configuração, assinatura e URL pública atrás de proxy, resposta exata, replay, autorização, janela, template, SQL real via PGlite, limite de 67%, deduplicação e isolamento do e-mail. Nenhum teste chama a Twilio real. Resultado local: 134 testes aprovados em npm test, executados em Node 26.1.0. O projeto declara Node 24; a validação real do Sandbox e a execução nesse runtime ficam para o ambiente configurado.
+Os testes cobrem SDK simulado, configuração, assinatura e URL pública atrás de proxy, resposta exata, replay, autorização, janela, template, SQL real via PGlite, limite de 67%, deduplicação e isolamento do e-mail. Nenhum teste chama a Twilio real. Os testes também verificam flags independentes, boas-vindas e histórico com alertas desativados, e bloqueio da fila/worker nessa configuração. A validação de entrega real e participação ativa deve ser feita no Sandbox configurado.
 
 Referências oficiais:
 - https://www.twilio.com/docs/usage/webhooks/webhooks-security
 - https://www.twilio.com/docs/whatsapp/sandbox
 - https://www.twilio.com/docs/whatsapp/tutorial/send-whatsapp-notification-messages-templates
+
+## Diagnóstico de rejeições do webhook
+
+Os logs da aplicação usam `event=whatsapp.webhook.decision`, `requestId`, `status` e `reason`. O `requestId` também aparece no cabeçalho `X-Request-Id` e no log de conclusão da requisição; não é necessariamente o ID dos Network Logs do Railway. Procure pelo horário e depois correlacione esses registros. Configure LOG_LEVEL=info para visualizar também os resultados 200; warn mostra as rejeições.
+
+| HTTP | reason | Conferência |
+| --- | --- | --- |
+| 403 | public_url_mismatch | Caminho e query recebidos devem coincidir exatamente com WHATSAPP_WEBHOOK_URL |
+| 403 | signature_missing | A chamada deve ser feita pela Twilio com X-Twilio-Signature |
+| 403 | signature_invalid | Conferir Auth Token da conta/subconta, URL HTTPS exata na Twilio e todos os parâmetros do formulário |
+| 403 | account_sid_mismatch | TWILIO_ACCOUNT_SID deve pertencer ao Sandbox que chamou a aplicação |
+| 403 | recipient_mismatch | TWILIO_WHATSAPP_FROM deve ser whatsapp:+ seguido do número do Sandbox, não o celular de teste |
+| 400 | message_sid_invalid / sender_invalid | MessageSid e remetente precisam ter formato válido; celular brasileiro com DDD e nove dígitos |
+| 415 | unsupported_content_type | Usar POST application/x-www-form-urlencoded |
+| 503 | auth_token_missing / database_failure | Verificar configuração ou banco; falha SQL usa event=whatsapp.webhook.failed |
+| 200 | webhook_disabled / sandbox_number_not_allowed / sender_not_eligible / duplicate_message | TwiML vazio, sem resposta WhatsApp |
+| 200 | welcome_replied | Boas-vindas incluídas no TwiML; entrega deve ser conferida na Twilio |
+
+A lista de números usa +55DDDNUMERO, sem prefixo whatsapp:, e aceita espaços apenas em torno dos itens separados por vírgulas. O remetente é normalizado somente depois da validação da assinatura. Nenhum desses logs registra token, assinatura, número, SID, corpo, URL/query ou erro SQL bruto.
+
+Para formulários, a assinatura utiliza todos os pares de parâmetros decodificados pelo parser, incluindo campos futuros; não utiliza o buffer bruto. A aplicação não filtra nem normaliza esses valores antes da validação. A URL externa HTTPS configurada é usada literalmente pelo SDK; o protocolo HTTP interno do Railway e os headers Host/X-Forwarded-* não a substituem. Não tente resolver um 403 removendo a validação ou usando URL interna.
+
+Somente horários e status dos Network Logs não permitem determinar qual validação falhou em uma requisição antiga. Os códigos acima permitem identificar a causa nas próximas chamadas após publicação manual desta versão. Mantenha WHATSAPP_ENABLED=false, WHATSAPP_WEBHOOK_ENABLED=true, WHATSAPP_MODE=sandbox e WHATSAPP_PRODUCTION_READY=false durante o diagnóstico.
