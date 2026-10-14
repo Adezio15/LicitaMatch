@@ -6,7 +6,7 @@ import { whatsappRoutes } from '../src/routes/whatsappRoutes.js';
 import twilio from 'twilio';
 import { PGlite } from '@electric-sql/pglite';
 import { createApp } from '../src/app.js';
-import { createWhatsAppService, normalizeWhatsAppNumber } from '../src/services/whatsappService.js';
+import { createWhatsAppService, normalizeWhatsAppNumber, normalizeWhatsAppSender } from '../src/services/whatsappService.js';
 import { sendWhatsAppAlerts } from '../src/services/whatsappAlertsService.js';
 import { createOperationsService } from '../src/services/operationsService.js';
 import { createSourceRegistry } from '../src/services/sources/sourceRegistry.js';
@@ -243,4 +243,76 @@ test('diagnósticos do webhook distinguem rejeições sem expor dados sensíveis
  await check(post(makeApp({WHATSAPP_WEBHOOK_URL:queryUrl}),body,twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,queryUrl,body),'/api/whatsapp/webhook?key=a%2Bb&other=c%20d'),200,'welcome_replied');
  const serialized=JSON.stringify(logs);
  for(const secret of [config.TWILIO_AUTH_TOKEN,config.TWILIO_ACCOUNT_SID,config.TWILIO_WHATSAPP_FROM,payload.to,sid,body.Body,body.FutureParameter,'private-signature','private-query','private SQL token','spoofed.example']) assert.ok(!serialized.includes(secret));
+});
+
+
+test('remetentes brasileiros usam E.164 canônico com nove dígitos',()=>{
+ for(const [address,canonical] of [
+  ['whatsapp:+5584999999999','+5584999999999'],
+  ['whatsapp:+5511987654321','+5511987654321'],
+  ['whatsapp:+5521967654321','+5521967654321']
+ ]) assert.equal(normalizeWhatsAppSender(address),canonical);
+ for(const value of [undefined,null,[],['whatsapp:+5584999999999'],'whatsapp:+','whatsapp: 5584999999999',
+  'whatsapp:%2B5584999999999','whatsapp:%252B5584999999999','whatsapp:+5584 99999-9999',
+  ' whatsapp:+5584999999999','whatsapp:+5584999999999 ','whatsapp:++5584999999999',
+  'whatsapp:+15555555555','whatsapp:+558433334444','whatsapp:+5509999999999',
+  'whatsapp:+5584888888888','whatsapp:+558499999999','whatsapp:+551187654321','whatsapp:+55849999999','whatsapp:+55849999999999'])
+  assert.throws(()=>normalizeWhatsAppSender(value));
+ // Account preferences and outbound alerts still require a nine-digit mobile.
+ assert.throws(()=>normalizeWhatsAppNumber('+558499999999'));
+});
+
+test('formulário preserva + codificado, rejeita dupla codificação e valida assinatura antes de normalizar',async()=>{
+ const app=express(),logs=[],lookups=[],parsed=[];
+ app.use(express.urlencoded({extended:false}));
+ app.use((req,res,next)=>{parsed.push(structuredClone(req.body));next();});
+ const audit=Object.fromEntries(['info','warn','error'].map(level=>[level,data=>logs.push(data)]));
+ app.use(whatsappRoutes({config:{...config,WHATSAPP_ENABLED:'false',WHATSAPP_SANDBOX_NUMBERS:'+5511987654321'},logger:audit,
+  database:{query:async(sql,values)=>{lookups.push(values);return {rows:[{id:1}]};}}}));
+ const baseBody={AccountSid:config.TWILIO_ACCOUNT_SID,To:config.TWILIO_WHATSAPP_FROM,MessageSid:sid,Body:'Olá + %2B 😃'};
+ const post=async(data,raw=new URLSearchParams(data).toString(),signed=data)=>{
+  const before=lookups.length;
+  const signature=twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,config.WHATSAPP_WEBHOOK_URL,signed);
+  const result=await request(app).post('/api/whatsapp/webhook').type('form').set('X-Twilio-Signature',signature).send(raw);
+  return {result,before,reason:logs.at(-1).reason};
+ };
+ for(const From of ['whatsapp:+5511987654321']) {
+  const data={...baseBody,From};
+  const {result}=await post(data);
+  assert.equal(result.status,200);
+  assert.ok(result.text.includes('<Message>'));
+  assert.equal(parsed.at(-1).From,From);
+  assert.equal(parsed.at(-1).Body,baseBody.Body);
+  assert.equal(lookups.at(-2)[0],'+5511987654321');
+ }
+ const legacy={...baseBody,From:'whatsapp:+551187654321'};
+ let outcome=await post(legacy,undefined,{...legacy,From:'whatsapp:+5511987654321'});
+ assert.equal(outcome.result.status,403);assert.equal(outcome.reason,'signature_invalid');assert.equal(lookups.length,outcome.before);
+ for(const From of ['whatsapp:%2B5511987654321','whatsapp:%252B5511987654321','whatsapp: 5511987654321','whatsapp:+551133334444']) {
+  outcome=await post({...baseBody,From});
+  assert.equal(outcome.result.status,400);assert.equal(outcome.reason,'sender_invalid');assert.equal(lookups.length,outcome.before);
+ }
+ const valid={...baseBody,From:'whatsapp:+5511987654321'};
+ // A literal + represents a space in form encoding, never an international prefix.
+ const literal=new URLSearchParams(valid).toString().replace('From=whatsapp%3A%2B','From=whatsapp%3A+');
+ outcome=await post(valid,literal);
+ assert.equal(parsed.at(-1).From,'whatsapp: 5511987654321');
+ assert.equal(outcome.result.status,403);assert.equal(outcome.reason,'signature_invalid');
+ const decodedSpace={...valid,From:'whatsapp: 5511987654321'};
+ outcome=await post(decodedSpace,literal);
+ assert.equal(outcome.result.status,400);assert.equal(outcome.reason,'sender_invalid');
+ const duplicateRaw=new URLSearchParams(valid).toString()+'&From='+encodeURIComponent(valid.From);
+ outcome=await post(valid,duplicateRaw,{...valid,From:[valid.From,valid.From]});
+ assert.ok(Array.isArray(parsed.at(-1).From));
+ assert.equal(outcome.result.status,400);assert.equal(outcome.reason,'sender_invalid');assert.equal(logs.at(-1).senderReason,'from_duplicated');assert.equal(lookups.length,outcome.before);
+});
+
+
+test('motivos de remetente inválido são códigos fixos sem número ou conteúdo',()=>{
+ for(const [value,code] of [
+  [undefined,'from_not_string'],[['whatsapp:+5584999999999'],'from_duplicated'],
+  ['whatsapp: 5584999999999','from_prefix_invalid'],['whatsapp:+5584 999999999','from_characters_invalid'],
+  ['whatsapp:+15555555555','from_country_invalid'],['whatsapp:+558499999999','from_length_invalid'],
+  ['whatsapp:+5584888888888','from_mobile_format_invalid']
+ ]) assert.throws(()=>normalizeWhatsAppSender(value),error=>error.code===code && !error.message.includes('5584'));
 });

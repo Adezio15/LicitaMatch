@@ -1,7 +1,7 @@
 import { whatsappEligibilitySql } from '../services/whatsappAlertsService.js';
 import { Router } from 'express';
 import twilio from 'twilio';
-import { normalizeWhatsAppNumber } from '../services/whatsappService.js';
+import { normalizeWhatsAppSender } from '../services/whatsappService.js';
 import { sandboxAllowed, WELCOME } from '../services/twilioWhatsAppService.js';
 
 export function whatsappRoutes({ config, database, logger }) {
@@ -9,11 +9,11 @@ export function whatsappRoutes({ config, database, logger }) {
   router.post('/api/whatsapp/webhook', async (req,res) => {
     // Log only fixed reason codes and the server-generated request ID. Never log
     // headers, URLs/queries, form values, phone numbers or provider errors.
-    const diagnostic = (reason, status, level = 'warn') => logger[level]({
-      event: 'whatsapp.webhook.decision', requestId: req.id, reason, status
+    const diagnostic = (reason, status, level = 'warn', senderReason) => logger[level]({
+      event: 'whatsapp.webhook.decision', requestId: req.id, reason, status, senderReason
     }, 'Resultado da validação do webhook WhatsApp');
-    const reject = (status, reason) => {
-      diagnostic(reason, status);
+    const reject = (status, reason, senderReason) => {
+      diagnostic(reason, status, 'warn', senderReason);
       return res.sendStatus(status);
     };
     const empty = reason => {
@@ -34,9 +34,8 @@ export function whatsappRoutes({ config, database, logger }) {
     if (req.body.AccountSid !== config.TWILIO_ACCOUNT_SID) return reject(403, 'account_sid_mismatch');
     if (req.body.To !== config.TWILIO_WHATSAPP_FROM) return reject(403, 'recipient_mismatch');
     if (typeof req.body.MessageSid !== 'string' || !/^SM[0-9a-fA-F]{32}$/.test(req.body.MessageSid)) return reject(400, 'message_sid_invalid');
-    if (typeof req.body.From !== 'string' || !/^whatsapp:\+/.test(req.body.From)) return reject(400, 'sender_invalid');
     let number;
-    try { number = normalizeWhatsAppNumber(req.body.From.slice(9)); } catch { return reject(400, 'sender_invalid'); }
+    try { number = normalizeWhatsAppSender(req.body.From); } catch (error) { return reject(400, 'sender_invalid', error.code); }
     if (!number) return reject(400, 'sender_invalid');
     if (config.WHATSAPP_WEBHOOK_ENABLED !== 'true') return empty('webhook_disabled');
     if ((config.WHATSAPP_MODE || 'sandbox') === 'sandbox' && !sandboxAllowed(config,number)) return empty('sandbox_number_not_allowed');

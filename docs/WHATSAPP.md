@@ -122,3 +122,11 @@ A lista de números usa +55DDDNUMERO, sem prefixo whatsapp:, e aceita espaços a
 Para formulários, a assinatura utiliza todos os pares de parâmetros decodificados pelo parser, incluindo campos futuros; não utiliza o buffer bruto. A aplicação não filtra nem normaliza esses valores antes da validação. A URL externa HTTPS configurada é usada literalmente pelo SDK; o protocolo HTTP interno do Railway e os headers Host/X-Forwarded-* não a substituem. Não tente resolver um 403 removendo a validação ou usando URL interna.
 
 Somente horários e status dos Network Logs não permitem determinar qual validação falhou em uma requisição antiga. Os códigos acima permitem identificar a causa nas próximas chamadas após publicação manual desta versão. Mantenha WHATSAPP_ENABLED=false, WHATSAPP_WEBHOOK_ENABLED=true, WHATSAPP_MODE=sandbox e WHATSAPP_PRODUCTION_READY=false durante o diagnóstico.
+
+## Formato do remetente brasileiro
+
+O webhook exige `From` único no formato `whatsapp:+55DDDNUMERO`, sem espaços, pontuação ou escapes ainda codificados: 13 dígitos após o +, DDD com primeiro dígito diferente de zero e celular com nove dígitos começando em 9. O resultado precisa coincidir com WHATSAPP_SANDBOX_NUMBERS e com o cadastro autorizado. Nenhum dígito é acrescentado ou removido do endereço recebido.
+
+No corpo application/x-www-form-urlencoded, `%2B` vira `+` uma única vez; um `+` literal vira espaço. Não há decodeURIComponent adicional, substituição de espaço por `+` nem alteração de req.body antes da assinatura. Campos From duplicados, escapes duplos e formatos inválidos são rejeitados.
+
+Quando reason=sender_invalid, o campo senderReason identifica a causa sem expor dados: from_duplicated, from_not_string, from_prefix_invalid, from_characters_invalid, from_country_invalid, from_length_invalid ou from_mobile_format_invalid. O diagnóstico ocorre somente depois da assinatura válida. Ter 13 dígitos não garante que prefixo, DDD e indicador inicial 9 do celular sejam válidos. Para identificar a causa de uma chamada específica, consulte esse código após publicação manual; o log anterior sender_invalid não contém detalhe suficiente.
