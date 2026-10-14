@@ -3,6 +3,8 @@ import { whatsappEligibilitySql } from './whatsappAlertsService.js';
 import { sandboxAllowed, createWhatsAppService } from './twilioWhatsAppService.js';
 import { safeOfficialUrl } from './sources/officialLink.js';
 
+const CANDIDATE_PAGE_SIZE = 100;
+
 export async function prepareSandboxTest(client, config, { empresaId, usuarioId, email }) {
   if (config.WHATSAPP_ENABLED !== 'false' || config.WHATSAPP_PRODUCTION_READY !== 'false' || config.WHATSAPP_MODE !== 'sandbox')
     throw new Error('Mantenha WhatsApp e produção desativados, no modo sandbox.');
@@ -15,8 +17,8 @@ export async function prepareSandboxTest(client, config, { empresaId, usuarioId,
     usuarioId=String(found.rows[0].id);
   }
   if (![empresaId,usuarioId].every(id => /^[1-9]\d*$/.test(String(id)))) throw new Error('Informe empresa e usuário explicitamente.');
-  const { rows } = await client.query(`SELECT e.id AS empresa_id,u.id AS usuario_id,u.whatsapp_numero,
-    m.id AS match_id,m.score,l.id AS licitacao_id,l.objeto,l.unidade_gestora,l.cidade,l.uf,l.url_fonte,
+  const sql = `SELECT e.id AS empresa_id,u.id AS usuario_id,u.whatsapp_numero,
+    m.id AS match_id,m.score,l.id AS licitacao_id,l.objeto,l.unidade_gestora,l.cidade,l.uf,l.link_edital,l.url_fonte,
     to_jsonb(l)->>'valor_estimado' AS valor_estimado,
     (SELECT max(recebido_em) FROM whatsapp_inbound WHERE numero=u.whatsapp_numero) AS last_inbound
     FROM empresas e JOIN usuarios u ON u.empresa_id=e.id JOIN matches m ON m.empresa_id=e.id
@@ -26,13 +28,27 @@ export async function prepareSandboxTest(client, config, { empresaId, usuarioId,
     AND u.whatsapp_numero=ANY($3::text[])
     AND NOT EXISTS (SELECT 1 FROM alertas_empresa_whatsapp a WHERE a.empresa_id=e.id AND a.licitacao_id=l.id AND a.numero=u.whatsapp_numero)
     AND NOT EXISTS (SELECT 1 FROM alertas a JOIN matches old ON old.id=a.match_id WHERE a.canal='whatsapp' AND a.usuario_id=u.id AND old.licitacao_id=l.id AND (a.status<>'pendente' OR a.tentativas>0))
-    ORDER BY m.score DESC,l.id,m.id LIMIT 1`, [empresaId,usuarioId,(config.WHATSAPP_SANDBOX_NUMBERS || '').split(',').map(n=>n.trim())]);
-  const row=rows[0];
-  if (!row || !sandboxAllowed(config,row.whatsapp_numero)) throw new Error('Nenhuma oportunidade ou destinatário elegível.');
-  if (!safeOfficialUrl(row.url_fonte)) throw new Error('Oportunidade sem link válido.');
+    AND ($4::numeric IS NULL OR m.score<$4 OR (m.score=$4 AND (l.id,m.id)>($5::bigint,$6::bigint)))
+    ORDER BY m.score DESC,l.id,m.id LIMIT ${CANDIDATE_PAGE_SIZE}`;
+  const numbers=(config.WHATSAPP_SANDBOX_NUMBERS || '').split(',').map(n=>n.trim());
+  let row, cursor=null, foundEligible=false;
+  // Validate each candidate in order; keyset pagination avoids loading all matches at once.
+  while (!row) {
+    const {rows}=await client.query(sql,[empresaId,usuarioId,numbers,cursor?.score ?? null,cursor?.licitacao_id ?? null,cursor?.match_id ?? null]);
+    for (const candidate of rows) {
+      if (!sandboxAllowed(config,candidate.whatsapp_numero)) continue;
+      foundEligible=true;
+      const link=safeOfficialUrl(candidate.link_edital) || safeOfficialUrl(candidate.url_fonte);
+      if (link) { row={...candidate,opportunity_url:link}; break; }
+    }
+    if (row || rows.length<CANDIDATE_PAGE_SIZE) break;
+    cursor=rows.at(-1);
+  }
+  if (!foundEligible) throw new Error('Nenhuma oportunidade ou destinatário elegível.');
+  if (!row) throw new Error('Nenhuma oportunidade elegível com link válido.');
   const last=new Date(row.last_inbound).getTime();
   if (!Number.isFinite(last) || last>Date.now() || Date.now()-last>=86400000) throw new Error('Envie uma mensagem ao Sandbox para abrir a janela de 24 horas; templates genéricos não comportam este alerta.');
-  const confirmation=createHash('sha256').update(JSON.stringify([row.empresa_id,row.usuario_id,row.whatsapp_numero,row.match_id,row.licitacao_id,row.score,row.objeto,row.unidade_gestora,row.cidade,row.uf,row.url_fonte,row.valor_estimado])).digest('hex');
+  const confirmation=createHash('sha256').update(JSON.stringify([row.empresa_id,row.usuario_id,row.whatsapp_numero,row.match_id,row.licitacao_id,row.score,row.objeto,row.unidade_gestora,row.cidade,row.uf,row.opportunity_url,row.valor_estimado])).digest('hex');
   return {row,confirmation};
 }
 
@@ -63,7 +79,7 @@ export async function runSandboxTest(client, config, options, provider) {
   let result;
   try {
     result=await createWhatsAppService({config,client:provider,sandboxTest:true}).sendMatchAlert({to:row.whatsapp_numero,score:row.score,lastInboundAt:row.last_inbound,
-      item:{objeto:row.objeto,unidadeGestora:row.unidade_gestora,municipio:row.cidade,uf:row.uf,urlFonte:row.url_fonte,valorEstimado:row.valor_estimado}});
+      item:{objeto:row.objeto,unidadeGestora:row.unidade_gestora,municipio:row.cidade,uf:row.uf,urlFonte:row.opportunity_url,valorEstimado:row.valor_estimado}});
   } catch(error) {
     await client.query('UPDATE alertas_empresa_whatsapp SET status=$2,erro_codigo=$3 WHERE id=$1',[alertId,error.definitive?'falhou':'incerto',error.providerCode || null]);
     throw error;

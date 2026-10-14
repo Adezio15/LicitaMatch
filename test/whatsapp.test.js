@@ -8,6 +8,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { createApp } from '../src/app.js';
 import { createWhatsAppService, normalizeWhatsAppNumber, normalizeWhatsAppSender } from '../src/services/whatsappService.js';
 import { sendWhatsAppAlerts } from '../src/services/whatsappAlertsService.js';
+import { prepareSandboxTest, runSandboxTest } from '../src/services/whatsappSandboxTestService.js';
 import { createOperationsService } from '../src/services/operationsService.js';
 import { createSourceRegistry } from '../src/services/sources/sourceRegistry.js';
 import { parseEnv } from '../src/config/env.js';
@@ -358,7 +359,6 @@ test('número com oito dígitos exige lista e cadastro exatos, consentimento e e
 });
 
 test('teste administrativo exige confirmação, autorização e permite uma única tentativa',async()=>{
- const {runSandboxTest}=await import('../src/services/whatsappSandboxTestService.js');
  const {db}=await fixture();
  const cfg={...config,WHATSAPP_ENABLED:'false',WHATSAPP_PRODUCTION_READY:'false',WHATSAPP_SANDBOX_TEST_ENABLED:'true'};
  const options={empresaId:'1',usuarioId:'1'};
@@ -397,7 +397,6 @@ test('teste administrativo exige confirmação, autorização e permite uma úni
 });
 
 test('teste administrativo mantém reserva após rejeição, timeout e falha de persistência',async()=>{
- const {runSandboxTest}=await import('../src/services/whatsappSandboxTestService.js');
  const {db}=await fixture();
  const cfg={...config,WHATSAPP_ENABLED:'false',WHATSAPP_PRODUCTION_READY:'false',WHATSAPP_SANDBOX_TEST_ENABLED:'true'};
  const options={empresaId:'1',usuarioId:'1'};
@@ -427,5 +426,115 @@ test('teste administrativo mantém reserva após rejeição, timeout e falha de 
    await assert.rejects(runSandboxTest(db,cfg,{...options,confirmation:preview.confirmation},provider));
    assert.equal(calls,before);
   }
+ } finally {await db.close();}
+});
+
+const sandboxTestConfig={...config,WHATSAPP_ENABLED:'false',WHATSAPP_PRODUCTION_READY:'false',WHATSAPP_SANDBOX_TEST_ENABLED:'true'};
+const sandboxTestOptions={empresaId:'1',usuarioId:'1'};
+async function sandboxLinkFixture() {
+ const {db}=await fixture();
+ await db.query('INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ($1,$2)',[sid,payload.to]);
+ return db;
+}
+
+test('prévia prioriza edital válido, usa fallback validado e rejeita links inválidos sem reservar',async()=>{
+ const db=await sandboxLinkFixture();
+ const edital='https://pncp.gov.br/app/editais/documento';
+ try {
+  for(const invalid of [null,'https://?','https://user:password@example.test/edital']) {
+   await db.query('UPDATE licitacoes_pncp SET link_edital=$1',[invalid]);
+   const result=await prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions);
+   assert.equal(result.row.opportunity_url,payload.item.urlFonte);
+  }
+  await db.query('UPDATE licitacoes_pncp SET link_edital=$1',[edital]);
+  const result=await prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions);
+  assert.equal(result.row.opportunity_url,edital);
+  // Changing an unused fallback does not change the link that the user confirms.
+  await db.query('UPDATE licitacoes_pncp SET url_fonte=$1',['https://pncp.gov.br/app/editais/outro']);
+  assert.equal((await prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions)).confirmation,result.confirmation);
+  for(const invalid of [null,'https://?','https://user:password@example.test/edital']) {
+   await db.query('UPDATE licitacoes_pncp SET link_edital=$1,url_fonte=$1',[invalid]);
+   await assert.rejects(prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions),/Nenhuma oportunidade elegível com link válido/);
+  }
+  assert.equal((await db.query('SELECT * FROM whatsapp_sandbox_test')).rows.length,0);
+  assert.equal((await db.query('SELECT * FROM alertas_empresa_whatsapp')).rows.length,0);
+ } finally {await db.close();}
+});
+
+test('seleção percorre mais de uma página preservando score e desempates',async()=>{
+ const db=await sandboxLinkFixture();
+ const link='https://pncp.gov.br/app/editais/segunda-pagina';
+ let reads=0;
+ const client={query:(sql,values)=>{if(sql.startsWith('SELECT e.id'))reads++;return db.query(sql,values);}};
+ try {
+  await db.exec(`UPDATE licitacoes_pncp SET url_fonte=NULL;
+    UPDATE matches SET score=90;
+    INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,cidade,uf)
+      SELECT 'WA-PAGE-'||n,'Compra de notebooks '||n,now(),'Secretaria','Pregão Eletrônico','Natal','RN' FROM generate_series(1,105) n;
+    INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score)
+      SELECT 1,id,1,80 FROM licitacoes_pncp WHERE id>1;
+    INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Outro interesse',ARRAY['notebook']);
+    INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (2,1,1,90);`);
+  const candidates=(await db.query("SELECT id FROM licitacoes_pncp WHERE codigo_externo IN ('WA-PAGE-104','WA-PAGE-105') ORDER BY id")).rows;
+  await db.query('UPDATE licitacoes_pncp SET link_edital=$1 WHERE id=ANY($2::bigint[])',[link,candidates.map(r=>r.id)]);
+  const selected=await prepareSandboxTest(client,sandboxTestConfig,sandboxTestOptions);
+  assert.equal(reads,2);
+  assert.equal(selected.row.licitacao_id,candidates[0].id);
+  assert.equal(selected.row.score,80);
+  assert.equal(selected.row.opportunity_url,link);
+  // A higher score wins even with a larger opportunity ID.
+  await db.query('UPDATE matches SET score=81 WHERE licitacao_id=$1',[candidates[1].id]);
+  assert.equal((await prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions)).row.licitacao_id,candidates[1].id);
+  await db.query('UPDATE matches SET score=80 WHERE licitacao_id=$1',[candidates[1].id]);
+  await db.query('INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (2,$1,1,80)',[candidates[0].id]);
+  const tied=(await db.query('SELECT id FROM matches WHERE licitacao_id=$1 ORDER BY id',[candidates[0].id])).rows;
+  assert.equal((await prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions)).row.match_id,tied[0].id);
+  // A valid link never overrides the existing business eligibility gate.
+  for(const change of [
+   'UPDATE matches SET score=66',
+   "UPDATE matches SET score=80,status='recusado'",
+   "UPDATE matches SET status='novo'; UPDATE interesses SET ativo=false",
+   "UPDATE interesses SET ativo=true; UPDATE licitacoes_pncp SET modalidade='Concorrência'"
+  ]) {
+   await db.exec(change);
+   await assert.rejects(prepareSandboxTest(db,sandboxTestConfig,sandboxTestOptions),/Nenhuma oportunidade ou destinatário elegível/);
+  }
+ } finally {await db.close();}
+});
+
+test('confirmação vincula link escolhido e revalida antes da reserva; envio simulado usa o mesmo link',async()=>{
+ const db=await sandboxLinkFixture();
+ const edital='https://pncp.gov.br/app/editais/documento';
+ const updated='https://pncp.gov.br/app/editais/documento-atualizado';
+ const sent=[];
+ const provider={messages:{create:async message=>{sent.push(message);return {sid};}}};
+ try {
+  await db.query('UPDATE licitacoes_pncp SET link_edital=$1',[edital]);
+  const preview=await runSandboxTest(db,sandboxTestConfig,sandboxTestOptions,provider);
+  assert.equal(preview.row.opportunity_url,edital);
+  await db.query('UPDATE licitacoes_pncp SET link_edital=$1',[updated]);
+  await assert.rejects(runSandboxTest(db,sandboxTestConfig,{...sandboxTestOptions,confirmation:preview.confirmation},provider),/Confirmação/);
+  await db.query('UPDATE licitacoes_pncp SET link_edital=$1',['https://?']);
+  await assert.rejects(runSandboxTest(db,sandboxTestConfig,{...sandboxTestOptions,confirmation:preview.confirmation},provider),/Confirmação/);
+  await db.query('UPDATE licitacoes_pncp SET link_edital=$1',[edital]);
+  for(const value of [updated,'https://?']) {
+   const changing={query:async(sql,values)=>{
+    const result=await db.query(sql,values);
+    if(sql.startsWith('LOCK TABLE whatsapp_sandbox_test')) await db.query('UPDATE licitacoes_pncp SET link_edital=$1',[value]);
+    return result;
+   }};
+   await assert.rejects(runSandboxTest(changing,sandboxTestConfig,{...sandboxTestOptions,confirmation:preview.confirmation},provider),/Elegibilidade ou oportunidade mudou/);
+   assert.equal(sent.length,0);
+   assert.equal((await db.query('SELECT * FROM whatsapp_sandbox_test')).rows.length,0);
+   assert.equal((await db.query('SELECT * FROM alertas_empresa_whatsapp')).rows.length,0);
+  }
+  assert.equal((await runSandboxTest(db,sandboxTestConfig,{...sandboxTestOptions,confirmation:preview.confirmation},provider)).accepted,true);
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,'whatsapp:'+payload.to);
+  assert.ok(sent[0].body.endsWith(edital));
+  assert.ok(!sent[0].body.includes(payload.item.urlFonte));
+  assert.equal((await db.query('SELECT confirmation FROM whatsapp_sandbox_test')).rows[0].confirmation,preview.confirmation);
+  await assert.rejects(runSandboxTest(db,sandboxTestConfig,{...sandboxTestOptions,confirmation:preview.confirmation},provider));
+  assert.equal(sent.length,1);
  } finally {await db.close();}
 });

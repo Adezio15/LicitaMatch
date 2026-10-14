@@ -143,6 +143,15 @@ servidor, worker nem agendador. Informe explicitamente a empresa de teste por CN
 seu gestor/admin por e-mail cadastrado ou ID; a seleção usa matches reais de pelo menos 67%, plano Premium,
 consentimento, preferência ativa, regras regionais e lista do Sandbox.
 
+A seleção percorre os candidatos por `m.score DESC, l.id, m.id`, em páginas de
+100 registros, até encontrar o primeiro com link válido. Prioriza `link_edital`
+validado por `safeOfficialUrl()` e usa `url_fonte` validado como alternativa.
+Se nenhum candidato tiver link válido, a prévia falha sem reservar tentativa.
+O mesmo link aparece na prévia, integra o token de confirmação e é enviado.
+Antes da reserva, a seleção e o link são revalidados; mudanças na oportunidade
+ou no link escolhido exigem uma nova prévia. Nenhum link é criado ou atualizado
+no banco por essa seleção.
+
 1. Envie uma mensagem ao Sandbox com o próprio número autorizado. O webhook
    autorizado precisa registrar essa mensagem em `whatsapp_inbound`.
 2. Execute `npm run whatsapp:test:sandbox -- --empresa ID --usuario ID` para

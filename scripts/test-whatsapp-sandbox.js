@@ -24,7 +24,7 @@ try {
   const result=await runSandboxTest(client,config,options);
   if(result.row) {
     const r=result.row;
-    console.log(JSON.stringify({empresa:r.empresa_id,usuario:r.usuario_id,destinatario:r.whatsapp_numero,licitacao:r.licitacao_id,orgao:r.unidade_gestora,objeto:r.objeto,municipio:r.cidade,uf:r.uf,valorEstimado:r.valor_estimado,compatibilidade:r.score,link:r.url_fonte},null,2));
+    console.log(JSON.stringify({empresa:r.empresa_id,usuario:r.usuario_id,destinatario:r.whatsapp_numero,licitacao:r.licitacao_id,orgao:r.unidade_gestora,objeto:r.objeto,municipio:r.cidade,uf:r.uf,valorEstimado:r.valor_estimado,compatibilidade:r.score,link:r.opportunity_url},null,2));
     console.log(`Confirme esta única mensagem com: npm run whatsapp:test:sandbox -- --empresa ${options.empresaId} --usuario ${r.usuario_id} --confirm ${result.confirmation}`);
   } else console.log(`Aceito pela Twilio: ${result.messageId}. Alerta ${result.alertId}; confira a entrega no Console Twilio e no WhatsApp.`);
 } catch(error) {
