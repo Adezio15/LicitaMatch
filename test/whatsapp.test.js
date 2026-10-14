@@ -27,6 +27,7 @@ async function fixture() {
  const db=new PGlite();
  for(const migration of await readMigrations()) await db.exec(migration.sql);
  await db.exec("INSERT INTO empresas (razao_social,cnpj,email,plano) VALUES ('Empresa','11222333000181','a@example.test','premium'); INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo,whatsapp_numero,alertas_whatsapp,whatsapp_consentimento_em) VALUES (1,'Gestor','a@example.test','$2b$12$'||repeat('x',53),'gestor','+5584999999999',true,now()); INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Notebooks',ARRAY['notebook']); INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,cidade,uf,url_fonte) VALUES ('WA-1','Compra de notebooks',now(),'Secretaria','Pregão Eletrônico','Natal','RN','https://pncp.gov.br/app/editais/123'); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,1,1,67);");
+ await db.exec('UPDATE matches SET created_at=clock_timestamp()');
  const query=(sql,values)=>sql.includes('pg_try_advisory_lock')?Promise.resolve({rows:[{locked:true}]}):sql.includes('pg_advisory_unlock')?Promise.resolve({rows:[]}):db.query(sql,values);
  return {db,database:{query,connect:async()=>({query,release(){}})}};
 }
@@ -158,7 +159,7 @@ test('fila SQL aplica 67%, consentimento, planos, janela, deduplicação e isola
   await db.exec("INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Computadores',ARRAY['notebook']); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (2,1,1,67);");
   assert.equal((await run()).sent,1);assert.equal((await run()).sent,0);assert.equal(calls,1);
   assert.equal((await db.query('SELECT status,provedor_mensagem_id FROM alertas_empresa_whatsapp')).rows[0].provedor_mensagem_id,sid);
-  await db.exec("INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,cidade,uf) VALUES ('WA-2','Compra',now(),'Secretaria','Pregão Eletrônico','Natal','RN'); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,2,1,67);");
+  await db.exec("INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,cidade,uf,url_fonte) VALUES ('WA-2','Compra',now(),'Secretaria','Pregão Eletrônico','Natal','RN','https://pncp.gov.br/app/editais/2'); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,2,1,67);");
   fail=true;assert.equal((await run()).failed,1);await run();assert.equal(calls,2);
   assert.equal((await db.query('SELECT status FROM alertas_empresa_whatsapp WHERE licitacao_id=2')).rows[0].status,'incerto');
   // A stored email delivery is independent and remains untouched.

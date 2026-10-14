@@ -13,7 +13,10 @@ export function opportunityRoutes(database) {
   router.post(['/conta/whatsapp','/api/conta/whatsapp'],requireAuth,requireManager,requireFeature('whatsapp'),async (req,res)=>{
     const data = validate(whatsappPreferenceSchema,req.body);
     await database.query(`UPDATE usuarios SET whatsapp_numero=$3,alertas_whatsapp=$4,
-      whatsapp_consentimento_em=CASE WHEN $4 THEN now() ELSE NULL END WHERE id=$1 AND empresa_id=$2`,
+      whatsapp_consentimento_em=CASE WHEN NOT $4 THEN NULL
+        WHEN NOT alertas_whatsapp OR whatsapp_numero IS DISTINCT FROM $3
+          OR whatsapp_consentimento_em IS NULL THEN clock_timestamp()
+        ELSE whatsapp_consentimento_em END WHERE id=$1 AND empresa_id=$2`,
     [req.user.id,req.user.empresa_id,data.whatsapp_numero,data.alertas_whatsapp]);
     if (req.path.startsWith('/api/')) return res.json({whatsapp_numero:data.whatsapp_numero,alertas_whatsapp:data.alertas_whatsapp});
     res.redirect(303,'/conta?alertas=salvos#whatsapp');

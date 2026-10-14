@@ -87,6 +87,15 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send({...whatsapp,confirmar_whatsapp:false}).expect(422);
     await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send({...whatsapp,empresa_id:second.company.id}).expect(422);
     await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send(whatsapp).expect(200);
+    const enrollment=async()=> (await db.query(`SELECT whatsapp_habilitado_em::text AS marco,
+      whatsapp_consentimento_em::text AS consentimento FROM usuarios WHERE id=$1`,[first.user.id])).rows[0];
+    const originalEnrollment=await enrollment();
+    assert.ok(originalEnrollment.marco);
+    await a.post('/api/conta/alertas').set('X-CSRF-Token',first.csrfToken).send({alertas_email:false}).expect(200);
+    assert.deepEqual(await enrollment(),originalEnrollment);
+    await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send(whatsapp).expect(200);
+    assert.deepEqual(await enrollment(),originalEnrollment);
+    await a.post('/api/conta/alertas').set('X-CSRF-Token',first.csrfToken).send({alertas_email:true}).expect(200);
     const preferences=(await db.query('SELECT whatsapp_numero,alertas_whatsapp FROM usuarios WHERE id=$1',[first.user.id])).rows[0];
     assert.deepEqual(preferences,{whatsapp_numero:'+5584999999999',alertas_whatsapp:true});
     assert.equal((await db.query('SELECT whatsapp_consentimento_em FROM usuarios WHERE id=$1',[second.user.id])).rows[0].whatsapp_consentimento_em,null);

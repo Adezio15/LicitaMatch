@@ -132,7 +132,7 @@ test('worker impede e-mail Start e WhatsApp Pro inclusive em filas anteriores ao
       await db.query("INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo,whatsapp_numero,alertas_whatsapp,whatsapp_consentimento_em) VALUES ($1,'Gestor',$2,'$2b$12$'||repeat('x',53),'gestor','+5584999999999',true,now())",[id,`${id}@test.dev`]);
       await db.query("INSERT INTO interesses (empresa_id,titulo,palavras) VALUES ($1,'Informática',ARRAY['notebook'])",[id]);
     }
-    await db.exec("INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade) VALUES ('P-1','Compra de notebook',now(),'Secretaria','Pregão Eletrônico')");
+    await db.exec("INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,url_fonte) VALUES ('P-1','Compra de notebook',now(),'Secretaria','Pregão Eletrônico','https://pncp.gov.br/app/editais/1')");
     await correlateOpportunities(database);
     await db.exec("INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id) SELECT empresa_id,licitacao_id,id FROM matches; INSERT INTO alertas (match_id,usuario_id,canal) SELECT id,empresa_id,'whatsapp' FROM matches; UPDATE empresas SET plano='start' WHERE id=1; UPDATE empresas SET plano='pro' WHERE id=2;");
     await db.exec("INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ('SMsandboxtest','+5584999999999')");
