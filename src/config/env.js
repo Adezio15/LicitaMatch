@@ -59,11 +59,14 @@ const schema = z.object({
   EMAIL_PROVIDER: z.enum(['smtp','resend','brevo_api']).default('smtp'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
   WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
-  WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1).optional(),
-  WHATSAPP_PHONE_NUMBER_ID: z.string().regex(/^\d+$/).optional(),
-  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.0$/).optional(),
-  WHATSAPP_TEMPLATE_NAME: z.string().regex(/^[a-z0-9_]+$/).optional(),
-  WHATSAPP_TEMPLATE_LANGUAGE: z.string().regex(/^[a-z]{2}(?:_[A-Z]{2})?$/).default('pt_BR'),
+  TWILIO_ACCOUNT_SID: z.string().regex(/^AC[0-9a-fA-F]{32}$/).optional(),
+  TWILIO_AUTH_TOKEN: z.string().trim().min(1).optional(),
+  TWILIO_WHATSAPP_FROM: z.string().regex(/^whatsapp:\+[1-9]\d{7,14}$/).optional(),
+  TWILIO_WHATSAPP_CONTENT_SID: z.string().regex(/^HX[0-9a-fA-F]{32}$/).optional(),
+  WHATSAPP_WEBHOOK_URL: z.string().url().default('https://licitamatch.online/api/whatsapp/webhook'),
+  WHATSAPP_MODE: z.enum(['sandbox','production']).default('sandbox'),
+  WHATSAPP_SANDBOX_NUMBERS: z.string().default('').refine(value => !value || value.split(',').every(n => /^\+55[1-9]\d9\d{8}$/.test(n.trim()))),
+  WHATSAPP_PRODUCTION_READY: z.enum(['true','false']).default('false'),
   ADMIN_EMAIL: z.preprocess(value => typeof value === 'string' && !value.trim() ? undefined : value, z.string().trim().email().optional()),
   EMAIL_FROM: z.string().email().optional(),
   SMTP_HOST: z.string().min(1).optional(),
@@ -85,10 +88,19 @@ const schema = z.object({
       ctx.addIssue({code:'custom',path:['DATABASE_DIRECT_URL'],message:'WORKER_REQUIRES_DIRECT_CONNECTION'});
     }
   }
+  const webhook = URL.canParse(config.WHATSAPP_WEBHOOK_URL) ? new URL(config.WHATSAPP_WEBHOOK_URL) : {};
+  if (webhook.protocol !== 'https:' || webhook.username || webhook.password || webhook.hash || webhook.pathname !== '/api/whatsapp/webhook')
+    ctx.addIssue({code:'custom',path:['WHATSAPP_WEBHOOK_URL'],message:'INVALID_PUBLIC_WEBHOOK'});
+  if (config.WHATSAPP_ENABLED === 'true' && config.WHATSAPP_MODE === 'production') {
+    for (const field of ['TWILIO_WHATSAPP_CONTENT_SID','WHATSAPP_PRODUCTION_READY']) {
+      if (!config[field] || (field === 'WHATSAPP_PRODUCTION_READY' && config[field] !== 'true'))
+        ctx.addIssue({code:'custom',path:[field],message:'PRODUCTION_NOT_READY'});
+    }
+  }
   if (config.EMAIL_ENABLED === 'true') for (const field of emailFields(config)) {
     if (!config[field]) ctx.addIssue({ code: 'custom', path: [field], message: 'MISSING' });
   }
-  if (config.WHATSAPP_ENABLED === 'true') for (const field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) {
+  if (config.WHATSAPP_ENABLED === 'true') for (const field of ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) {
     if (!config[field]) ctx.addIssue({code:'custom',path:[field],message:'MISSING'});
   }
 }).refine(config => config.NODE_ENV !== 'production' || config.LOCAL_DATABASE === 'false', {
@@ -100,8 +112,7 @@ export function parseEnv(input) {
   normalizedInput.COMPRASNET_ENABLED ??= 'true';
   normalizedInput.EMAIL_PROVIDER = emailProvider(normalizedInput);
   for (const [flag, fields] of Object.entries({
-    EMAIL_ENABLED: emailFields(normalizedInput),
-    WHATSAPP_ENABLED: ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION', 'WHATSAPP_TEMPLATE_NAME']
+    EMAIL_ENABLED: emailFields(normalizedInput)
   })) normalizedInput[flag] ??= fields.every(field => typeof normalizedInput[field] === 'string' && normalizedInput[field].trim()) ? 'true' : 'false';
   const result = schema.safeParse(normalizedInput);
   if (!result.success) {

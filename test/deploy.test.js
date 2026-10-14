@@ -69,7 +69,7 @@ test('verificação somente leitura identifica migrations e tabelas ausentes e c
   } };
   const migrationClient = { query(sql, params) {
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
-    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE')) return db.exec(sql);
+    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE') || sql.includes('CREATE FUNCTION')) return db.exec(sql);
     return db.query(sql, params);
   } };
   try {
@@ -89,7 +89,7 @@ test('banco parcialmente migrado recebe somente migrations pendentes e preserva 
   const db = new PGlite();
   const client = { query(sql, params) {
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
-    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE')) return db.exec(sql);
+    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE') || sql.includes('CREATE FUNCTION')) return db.exec(sql);
     return db.query(sql, params);
   } };
   try {

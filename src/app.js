@@ -1,3 +1,4 @@
+import { whatsappRoutes } from './routes/whatsappRoutes.js';
 import { plans } from './services/planService.js';
 import express from 'express';
 import helmet from 'helmet';
@@ -30,6 +31,7 @@ export function createApp({ config, database, logger, operationsDatabase = datab
   }));
   app.use(express.json({ limit: '100kb' }));
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+  app.use(whatsappRoutes({ config, database, logger }));
   app.use(createRoutes(database, logger));
   app.use('/assets', express.static(fileURLToPath(new URL('./public', import.meta.url))));
   const sessions = createSession({ config, database, logger });

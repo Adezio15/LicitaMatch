@@ -43,7 +43,7 @@ test('produção ativa Compras.gov por padrão e alertas somente com credenciais
   assert.equal(resend.EMAIL_PROVIDER, 'resend');
   assert.throws(() => parseEnv({ ...base, EMAIL_ENABLED: 'true', EMAIL_PROVIDER: 'resend', EMAIL_FROM: 'alerts@example.test' }), /RESEND_API_KEY/);
   const whatsapp = { WHATSAPP_ACCESS_TOKEN: 'synthetic', WHATSAPP_PHONE_NUMBER_ID: '123', WHATSAPP_API_VERSION: 'v23.0', WHATSAPP_TEMPLATE_NAME: 'alerta' };
-  assert.equal(parseEnv({ ...base, ...whatsapp }).WHATSAPP_ENABLED, 'true');
+  assert.equal(parseEnv({ ...base, ...whatsapp }).WHATSAPP_ENABLED, 'false');
   assert.equal(parseEnv({ ...base, ...whatsapp, WHATSAPP_ENABLED: 'false' }).WHATSAPP_ENABLED, 'false');
 });
 

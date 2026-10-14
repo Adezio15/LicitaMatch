@@ -70,9 +70,10 @@ test('modalidades em todas as UFs nas páginas, dashboard e alertas dos dois can
       INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id) SELECT 1,l.id,m.id FROM matches m
         JOIN licitacoes_pncp l ON l.id=m.licitacao_id WHERE l.codigo_externo='regional-9';
       INSERT INTO tarefas (nome,proxima_execucao) VALUES ('matches',now()+interval '1 day');`);
+    await db.exec("INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ('SMsandboxtest','+5584999999999')");
     const sent = { email: 0, whatsapp: 0 };
     const delivery = channel => ({ sendMatchAlert: async () => { sent[channel]++; return { accepted: true, messageId: 'test' }; } });
-    worker = createOperationsService({ database, config: { EMAIL_ENABLED: 'true', WHATSAPP_ENABLED: 'true', ALERT_MIN_SCORE: 70 },
+    worker = createOperationsService({ database, config: { EMAIL_ENABLED: 'true', WHATSAPP_ENABLED: 'true', WHATSAPP_MODE:'sandbox', WHATSAPP_SANDBOX_NUMBERS:'+5584999999999', ALERT_MIN_SCORE: 70 },
       registry: createSourceRegistry(), logger: { info() {}, error() {} }, emailService: delivery('email'), whatsappService: delivery('whatsapp') });
     await worker.runOnce();
     assert.deepEqual(sent, { email: allowed.length, whatsapp: allowed.length });

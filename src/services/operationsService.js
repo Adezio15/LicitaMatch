@@ -1,3 +1,4 @@
+import { sendWhatsAppAlerts } from './whatsappAlertsService.js';
 import { premiumTrialService } from './premiumTrialService.js';
 import { sendEmail, sendTestEmail, emailError } from './emailDiagnostics.js';
 import { createDefaultSourceRegistry, sourceTaskDefinitions } from './sources/defaultSources.js';
@@ -146,50 +147,7 @@ export function createOperationsService({ database, config, logger, registry, em
 
   async function alerts(client,channel) {
     if (channel === 'email') return companyEmailAlerts(client);
-    const minScore = config.ALERT_MIN_SCORE;
-    const preference = `(plano_efetivo(e)='premium' AND u.alertas_whatsapp=true AND u.whatsapp_numero<>''
-      AND u.whatsapp_consentimento_em IS NOT NULL AND u.tipo IN ('gestor','admin'))`;
-    await client.query(`INSERT INTO alertas (match_id,usuario_id,canal)
-      SELECT m.id,u.id,$2 FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
-      JOIN licitacoes_pncp l ON l.id=m.licitacao_id
-      JOIN empresas e ON e.id=m.empresa_id JOIN usuarios u ON u.empresa_id=m.empresa_id
-      WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
-      AND e.status='ativo' AND u.ativo=true AND ${preference} AND licitacao_permitida(l.modalidade,l.uf)
-      ON CONFLICT (match_id,usuario_id,canal) DO NOTHING`, [minScore,channel]);
-    const { rows } = await client.query(`SELECT a.id,e.id AS empresa_id,u.email,u.whatsapp_numero,e.razao_social,i.titulo,m.score,l.objeto,l.modalidade,l.unidade_gestora,l.url_fonte
-      FROM alertas a JOIN matches m ON m.id=a.match_id
-      JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
-      JOIN usuarios u ON u.id=a.usuario_id AND u.empresa_id=m.empresa_id
-      JOIN empresas e ON e.id=u.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
-      WHERE a.status='pendente' AND a.canal=$2 AND a.proxima_tentativa<=now() AND a.tentativas<5
-      AND u.ativo=true AND ${preference} AND e.status='ativo' AND i.ativo=true
-      AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf) ORDER BY a.id LIMIT 25`, [minScore,channel]);
-    logger.info({ event: 'alerts.batch', channel, selected: rows.length, limit: 25 }, 'Fila selecionada para envio');
-    let sent = 0, failed = 0;
-    for (const row of rows) {
-      if (stopped) { logger.info({ event: 'alert.skipped', channel, reason: 'worker_encerrando' }, 'Envio ignorado'); break; }
-      // Recheck after batch selection: an admin may have changed the plan meanwhile.
-      const eligible = await client.query("SELECT id FROM empresas WHERE id=$1 AND status='ativo' AND plano_efetivo(empresas)='premium'", [row.empresa_id]);
-      if (!eligible.rows.length) continue;
-      logger.info({ event: 'alert.called', channel, alertId: row.id, empresa: row.razao_social, recipient: channel === 'email' ? row.email : row.whatsapp_numero }, 'Envio chamado');
-      const context = { alertId: row.id, empresa: row.razao_social, interesse: row.titulo, score: row.score,
-        destinatario: row.email };
-      if (channel === 'email') logger.info({ ...context, event: 'automatic.alert.start', recipient: row.email }, 'Início do alerta automático');
-      try {
-        const delivery = channel==='email' ? emailService : whatsappService;
-        const result = await delivery.sendMatchAlert({ to: channel==='email' ? row.email : row.whatsapp_numero,customer: row.razao_social,interestName: row.titulo,
-          score: row.score,context,item: { objeto: row.objeto,modalidade: row.modalidade,unidadeGestora: row.unidade_gestora, urlFonte: row.url_fonte } });
-        await client.query("UPDATE alertas SET status='enviado',enviado_em=now(),tentativas=tentativas+1,provedor_mensagem_id=$2 WHERE id=$1", [row.id,result?.messageId || null]);
-        sent++;
-      } catch (error) {
-        await client.query(`UPDATE alertas SET tentativas=tentativas+1,
-          status=CASE WHEN tentativas>=4 THEN 'falhou' ELSE 'pendente' END,
-          proxima_tentativa=now()+interval '15 minutes' WHERE id=$1`, [row.id]);
-        logger.error({ task: 'alertas',channel, alertId: row.id, error: emailError(error, config) }, 'Falha no alerta');
-        failed++;
-      }
-    }
-    return { sent,failed };
+    return sendWhatsAppAlerts({client,config,service:whatsappService,logger,stopped:()=>stopped});
   }
 
   async function cycle() {
@@ -269,9 +227,9 @@ export function createOperationsService({ database, config, logger, registry, em
     },
     async overview() {
       const tasks = (await database.query('SELECT * FROM tarefas ORDER BY nome')).rows;
-      const alerts = (await database.query(`SELECT canal,status,count(*)::int AS total FROM (SELECT canal,status FROM alertas WHERE canal='whatsapp' UNION ALL SELECT 'email' AS canal,status FROM alertas_empresa_email) deliveries GROUP BY canal,status ORDER BY canal,status`)).rows;
+      const alerts = (await database.query(`SELECT canal,status,count(*)::int AS total FROM (SELECT 'whatsapp' AS canal,status FROM alertas_empresa_whatsapp UNION ALL SELECT 'email' AS canal,status FROM alertas_empresa_email) deliveries GROUP BY canal,status ORDER BY canal,status`)).rows;
       return { tasks,alerts,workerEnabled: config.WORKER_ENABLED === 'true',emailEnabled: config.EMAIL_ENABLED === 'true',whatsappEnabled:config.WHATSAPP_ENABLED==='true',
-        diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', emailFields(config)), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_TEMPLATE_NAME']) },
+        diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', emailFields(config)), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) },
         sources: listPortalSources(registry) };
     },
     async schedule() {

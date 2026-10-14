@@ -135,10 +135,11 @@ test('worker impede e-mail Start e WhatsApp Pro inclusive em filas anteriores ao
     await db.exec("INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade) VALUES ('P-1','Compra de notebook',now(),'Secretaria','Pregão Eletrônico')");
     await correlateOpportunities(database);
     await db.exec("INSERT INTO alertas_empresa_email (empresa_id,licitacao_id,match_id) SELECT empresa_id,licitacao_id,id FROM matches; INSERT INTO alertas (match_id,usuario_id,canal) SELECT id,empresa_id,'whatsapp' FROM matches; UPDATE empresas SET plano='start' WHERE id=1; UPDATE empresas SET plano='pro' WHERE id=2;");
+    await db.exec("INSERT INTO whatsapp_inbound (mensagem_id,numero) VALUES ('SMsandboxtest','+5584999999999')");
     const emails=[],whatsapps=[];
-    worker = createOperationsService({ database, config:{...config,EMAIL_ENABLED:'true',WHATSAPP_ENABLED:'true'}, logger, registry:createSourceRegistry(),
+    worker = createOperationsService({ database, config:{...config,EMAIL_ENABLED:'true',WHATSAPP_ENABLED:'true',WHATSAPP_MODE:'sandbox',WHATSAPP_SANDBOX_NUMBERS:'+5584999999999'}, logger, registry:createSourceRegistry(),
       emailService:{sendMatchAlert:async p => {emails.push(p.to);return {messageId:'email'};}},
-      whatsappService:{sendMatchAlert:async p => {whatsapps.push(p.customer);return {messageId:'whatsapp'};}} });
+      whatsappService:{sendMatchAlert:async p => {whatsapps.push(p.customer);return {accepted:true,messageId:'whatsapp'};}} });
     await worker.runOnce();
     assert.deepEqual(emails.sort(),['2@test.dev','3@test.dev']);
     assert.deepEqual(whatsapps,['Empresa 3']);
