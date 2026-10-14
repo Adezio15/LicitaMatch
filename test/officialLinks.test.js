@@ -21,7 +21,7 @@ test('links vêm do payload, preservam processo/portal e nunca são deduzidos pe
     assert.equal(normalize([{...item,linkSistemaOrigem:official}])[0].urlFonte,official);
     assert.equal(normalize([{...item,urlEdital:official,linkSistemaOrigem:'https://portal.example.gov.br/'}])[0].urlFonte,official);
     assert.equal(normalize([{...item,linkSistemaOrigem:'https://portal.example.gov.br/',linkProcessoEletronico:official}])[0].urlFonte,official);
-    assert.equal(normalize([{...item,linkSistemaOrigem:'https://portal.example.gov.br/'}])[0].urlFonte,'https://portal.example.gov.br/');
+    assert.equal(normalize([{...item,linkSistemaOrigem:'https://portal.example.gov.br/'}])[0].urlFonte,undefined);
   }
   assert.equal(normalizePncpItems([{...item,unidadeOrgao:{nomeUnidade:'Secretaria',ufSigla:'RN',municipioNome:'Natal'}}])[0].cidade,'Natal');
   assert.equal(normalizeComprasnetItems([{...item,unidadeOrgaoMunicipioNome:'Natal'}])[0].cidade,'Natal');

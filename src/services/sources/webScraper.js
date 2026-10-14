@@ -1,4 +1,4 @@
-import { safeOfficialUrl } from './officialLink.js';
+import { safeOfficialUrl, procurementUrl } from './officialLink.js';
 
 export async function fetchHtml(fetchImpl, url, name = 'site', onPage) {
   const response = await fetchImpl(url, {
@@ -103,7 +103,7 @@ function scrapedOfficialLink(html, pageUrl) {
   if (links.size === 1) return [...links][0];
   // Multiple candidate links cannot be safely associated with this record.
   // This is the page that was actually fetched, not a guessed detail URL.
-  return pageUrl;
+  return procurementUrl(pageUrl);
 }
 
 export async function scrapeComprasnetFallback({ fetchImpl, baseUrl, page = 1, pageSize = 50 } = {}) {

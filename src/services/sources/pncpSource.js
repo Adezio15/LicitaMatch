@@ -1,7 +1,8 @@
+import { createOfficialApiClient, createPncpLinkResolver } from './officialLinkResolver.js';
 import { officialUrlFromRecord } from './officialUrl.js';
 import { fetchJson, queryWindow, unitName } from './httpSource.js';
 import { normalizeUf, pncpModalidade } from './procurementMetadata.js';
-import { officialLink, sourceCity } from './officialLink.js';
+import { officialLink, sourceCity, extractOfficialLinks } from './officialLink.js';
 const DEFAULT_PNCP_URL = 'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao';
 
 export function normalizePncpItems(payload) {
@@ -22,7 +23,7 @@ export function normalizePncpItems(payload) {
   }).filter(Boolean);
 }
 
-export function createPncpSource({ fetchImpl = globalThis.fetch, baseUrl = DEFAULT_PNCP_URL } = {}) {
+export function createPncpSource({ fetchImpl = globalThis.fetch, baseUrl = DEFAULT_PNCP_URL, logger } = {}) {
   return { async fetchLatest(query = {}) {
     const { page,pageSize,start,end } = queryWindow(query);
     const url = new URL(baseUrl);
@@ -34,7 +35,26 @@ export function createPncpSource({ fetchImpl = globalThis.fetch, baseUrl = DEFAU
     const payload = await fetchJson(fetchImpl,url,'PNCP');
     if (!Array.isArray(payload) && !Array.isArray(payload.data)) throw new Error('Payload inválido do PNCP.');
     const items = normalizePncpItems(payload);
-    return { source: 'pncp',page,pageSize,count: items.length,items,
+    const records = Array.isArray(payload) ? payload : payload.data;
+    const byId = new Map(records.filter(record => record && typeof record === 'object').map(record => [String(record.numeroControlePNCP || record.id || record._id || record.codigo || '').trim(), record]));
+    const resolver = createPncpLinkResolver({ api: createOfficialApiClient({ fetchImpl, maxRequests: 50 }) });
+    const links = { found: 0, rejected: 0, missing: 0, recovered: 0, failed: 0 };
+    for (const item of items) {
+      links.rejected += extractOfficialLinks(byId.get(item.id)).rejected;
+      if (item.urlFonte) { links.found++; continue; }
+      const result = await resolver.resolve(byId.get(item.id), { details: true });
+      links.rejected += result.rejected || 0;
+      if (result.urlFonte) {
+        item.urlFonte = result.urlFonte;
+        item.link_edital = result.link_edital;
+        links.found++; links.recovered++;
+      } else {
+        links.missing++;
+        if (result.status === 'falha_consulta') links.failed++;
+      }
+    }
+    logger?.info({ event: 'official_links.import', source: 'pncp', ...links }, 'Links oficiais na importação');
+    return { source: 'pncp',page,pageSize,count: items.length,items,links,
       totalPages: Number(payload.totalPaginas ?? page), hasMore: payload.totalPaginas ? page < Number(payload.totalPaginas) : false };
   } };
 }

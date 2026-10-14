@@ -12,14 +12,45 @@ export function safeOfficialUrl(value, base) {
   } catch { return null; }
 }
 
+// A homepage is not evidence for a particular procurement.
+export function procurementUrl(value) {
+  const link = safeOfficialUrl(value);
+  if (!link) return null;
+  const url = new URL(link);
+  return url.pathname !== '/' || url.search || url.hash ? link : null;
+}
+
+const documentKeys = ['urlEdital', 'linkEdital', 'link_edital'];
+const pageKeys = ['urlContratacao', 'linkContratacao', 'urlOportunidade', 'url_oportunidade',
+  'linkProcessoEletronico', 'urlProcessoEletronico', 'linkSistemaOrigem',
+  'urlPncp', 'linkPncp', 'url_fonte', 'urlFonte', 'url', 'link'];
+
+export function extractOfficialLinks(item = {}) {
+  if (!item || typeof item !== 'object') item = {};
+  let rejected = 0;
+  const accept = value => {
+    const url = procurementUrl(value);
+    if (typeof value === 'string' && value.trim() && !url) rejected++;
+    return url;
+  };
+  const documents = [item.documentos, item.arquivos, item.documents].filter(Array.isArray).flat();
+  const candidates = documents.filter(doc => doc && doc.ativo !== false && doc.statusAtivo !== false)
+    .map(doc => ({
+      edital: /^(edital|aviso de contrata[cç][aã]o direta)\b/i.test(
+        doc.tipoDocumentoNome || doc.tipoDocumento?.descricao || doc.nomeDocumento || doc.titulo || ''),
+      url: [doc.url, doc.urlDocumento, doc.link, doc.arquivoLicitacao?.nomeArquivoFisico]
+        .map(accept).find(Boolean)
+    }));
+  // Never treat an arbitrary attachment (e.g. ata) as the edital.
+  const edital = documentKeys.map(key => accept(item[key])).find(Boolean)
+    || candidates.find(doc => doc.edital && doc.url)?.url || null;
+  const page = pageKeys.map(key => accept(item[key])).find(Boolean) || null;
+  const url = edital || page;
+  return { link_edital: edital || page, urlFonte: url, rejected };
+}
+
 export function officialLink(item = {}) {
-  const candidates = [item.urlEdital, item.linkEdital, item.urlContratacao, item.linkContratacao,
-    item.linkProcessoEletronico, item.urlProcessoEletronico, item.linkSistemaOrigem,
-    item.urlPncp, item.linkPncp, item.url_fonte, item.urlFonte, item.url, item.link]
-    .map(value => safeOfficialUrl(value)).filter(Boolean);
-  // A record/process page is more useful than a portal's home page.
-  return candidates.find(value => { const url = new URL(value); return url.pathname !== '/' || url.search || url.hash; })
-    || candidates[0] || null;
+  return extractOfficialLinks(item).urlFonte;
 }
 
 export function sourceCity(value) {

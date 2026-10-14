@@ -2,7 +2,7 @@ import { validOfficialUrl } from './sources/officialUrl.js';
 import { createHash } from 'node:crypto';
 import { normalizeItemSignature } from './deduplicationService.js';
 import { normalizeUf } from './sources/procurementMetadata.js';
-import { safeOfficialUrl, sourceCity } from './sources/officialLink.js';
+import { safeOfficialUrl, sourceCity, extractOfficialLinks } from './sources/officialLink.js';
 
 export function pncpRepository(database) {
   return {
@@ -13,7 +13,7 @@ export function pncpRepository(database) {
         modalidade=CASE WHEN $3='N/D' THEN modalidade ELSE $3 END,
         url_fonte=CASE WHEN $4::text IS NULL THEN url_fonte
           WHEN url_fonte IS NOT NULL AND url_fonte !~* '^https?://[^/?#]+/?$' AND $4 ~* '^https?://[^/?#]+/?$' THEN url_fonte
-          ELSE $4 END, cidade=COALESCE($5,cidade), link_edital=COALESCE($7,link_edital)
+          ELSE $4 END, cidade=COALESCE($5,cidade), link_edital=COALESCE(NULLIF(btrim(link_edital),''),$7)
         WHERE id=(SELECT id FROM licitacoes_pncp WHERE codigo_externo=$1 OR (assinatura=$6 AND COALESCE(uf,'')=COALESCE($2,''))
           ORDER BY (codigo_externo=$1) DESC,id LIMIT 1) RETURNING id`,
       [item.id, normalizeUf(item.uf), item.modalidade || 'N/D', safeOfficialUrl(item.urlFonte), sourceCity(item.cidade), signature, validOfficialUrl(item.link_edital)]);
@@ -42,11 +42,12 @@ export async function persistPncpItems(database, items = [], origem = 'pncp') {
 
   for (const item of list) {
     if (!item || !item.id || !item.objeto || !item.dataAbertura || !item.unidadeGestora) continue;
+    const links = extractOfficialLinks(item);
     const normalized = {
       origem,
-      link_edital: validOfficialUrl(item.link_edital),
+      link_edital: links.link_edital,
       uf: normalizeUf(item.uf),
-      urlFonte: safeOfficialUrl(item.urlFonte || item.url_fonte),
+      urlFonte: links.urlFonte,
       cidade: sourceCity(item.cidade),
       id: String(item.id).trim(),
       objeto: String(item.objeto).trim(),

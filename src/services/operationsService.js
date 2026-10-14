@@ -1,3 +1,4 @@
+import { extractOfficialLinks } from './sources/officialLink.js';
 import { sendWhatsAppAlerts } from './whatsappAlertsService.js';
 import { premiumTrialService } from './premiumTrialService.js';
 import { sendEmail, sendTestEmail, emailError } from './emailDiagnostics.js';
@@ -11,7 +12,7 @@ import { safeError } from '../utils/safeError.js';
 import { createWhatsAppService } from './whatsappService.js';
 
 export function createOperationsService({ database, config, logger, registry, emailService, whatsappService }) {
-  registry ||= createDefaultSourceRegistry(config);
+  registry ||= createDefaultSourceRegistry(config, { logger });
   const emailMinScore = 67;
   if (!emailService && config.EMAIL_ENABLED === 'true') {
     emailService = createEmailService({
@@ -35,6 +36,14 @@ export function createOperationsService({ database, config, logger, registry, em
     for (; pages < config.SYNC_MAX_PAGES && !stopped; pages++) {
       const result = await registry.fetch(definition.source, { ...cursor, pageSize: 50, modalidade: definition.modalidade });
       found += result.items.length;
+      if (!result.links) {
+        const extracted = result.items.map(extractOfficialLinks);
+        logger.info({ event: 'official_links.import', source: definition.source,
+          found: extracted.filter(item => item.urlFonte).length,
+          missing: extracted.filter(item => !item.urlFonte).length,
+          rejected: extracted.reduce((sum, item) => sum + item.rejected, 0), recovered: 0
+        }, 'Links oficiais na importação');
+      }
       logger.info({ event: 'search.page', task: definition.name, page: cursor.page, found: result.items.length }, 'Licitações encontradas na página');
       inserted += await persistPncpItems(client,result.items,definition.source);
       cursor = result.hasMore ? { ...cursor, page: cursor.page + 1 } : {};

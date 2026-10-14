@@ -1,7 +1,6 @@
 import { fetchJson, queryWindow } from './httpSource.js';
 import { normalizeUf } from './procurementMetadata.js';
 import { officialLink } from './officialLink.js';
-import { validOfficialUrl } from './officialUrl.js';
 
 export const SENAC_API = 'https://transparencia.senac.br/service/api/licitacoes/regional/';
 
@@ -18,12 +17,7 @@ export function normalizeSenacItems(payload, regional) {
     const objeto = typeof record.objeto === 'string' ? record.objeto.trim() : '';
     const dataAbertura = record.dataAbertura;
     if (!id || !objeto || typeof dataAbertura !== 'string' || Number.isNaN(Date.parse(dataAbertura))) continue;
-    const documents = Array.isArray(record.documentos) ? record.documentos : [];
-    const edital = documents.find(doc => doc?.ativo !== false &&
-      /^edital\b/i.test(doc.tipoDocumento?.descricao || doc.nomeDocumento || '') &&
-      validOfficialUrl(doc.arquivoLicitacao?.nomeArquivoFisico));
-    // Preserve only explicit URLs. Relative storage paths are not public links.
-    const urlFonte = officialLink(record) || validOfficialUrl(edital?.arquivoLicitacao?.nomeArquivoFisico);
+    const urlFonte = officialLink(record);
     const uf = normalizeUf(regional);
     items.push({ id: `senac:${regional.toLowerCase()}:${id}`, objeto, dataAbertura,
       unidadeGestora: `Senac ${regional.toUpperCase()}`, modalidade: String(group.modalidade || 'N/D'),

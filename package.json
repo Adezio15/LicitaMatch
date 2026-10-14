@@ -21,9 +21,10 @@
     "db:check": "node scripts/check-deploy.js",
     "db:seed": "node scripts/seed.js",
     "admin:create": "node scripts/create-admin.js",
-    "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage",
-    "whatsapp:test:sandbox": "node scripts/test-whatsapp-sandbox.js"
+    "test": "node --test test/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage test/*.test.js",
+    "whatsapp:test:sandbox": "node scripts/test-whatsapp-sandbox.js",
+    "links:recover": "node scripts/recover-official-links.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

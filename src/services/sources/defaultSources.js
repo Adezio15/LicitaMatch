@@ -6,10 +6,10 @@ import { createSenacSource } from './senacSource.js';
 import { createRecifeSource } from './recifeSource.js';
 import { createSescSource } from './sescSource.js';
 
-export function createDefaultSourceRegistry(config, { fetchImpl = globalThis.fetch } = {}) {
+export function createDefaultSourceRegistry(config, { fetchImpl = globalThis.fetch, logger } = {}) {
   const sync = config.SYNC_ENABLED === 'true';
   const registry = createSourceRegistry({
-    pncp: { ...createPncpSource({ fetchImpl }), name: 'PNCP', enabled: sync },
+    pncp: { ...createPncpSource({ fetchImpl, logger }), name: 'PNCP', enabled: sync },
     comprasnet: { ...createComprasnetSource({ fetchImpl }), name: 'Compras.gov.br', enabled: sync && config.COMPRASNET_ENABLED === 'true' },
     'portal-37': { ...createRecifeSource({ fetchImpl }), enabled: sync && config.RECIFE_ENABLED !== 'false' }
   });
