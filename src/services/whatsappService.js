@@ -1,10 +1,11 @@
+import { brazilWhatsAppNumberRegex } from './brazilWhatsAppNumber.js';
 export { createWhatsAppService } from './twilioWhatsAppService.js';
 export function normalizeWhatsAppNumber(value) {
   if (typeof value !== 'string' || !/^[+\d\s().-]*$/.test(value) || value.length>30) throw new Error('Informe um celular válido com DDD.');
   const digits = value.replace(/\D/g,'');
   if (!digits) return '';
-  const number = digits.length===11 ? '+55'+digits : '+'+digits;
-  if (!/^\+55[1-9]\d9\d{8}$/.test(number)) throw new Error('Informe um celular brasileiro com DDD e nove dígitos.');
+  const number = !value.trim().startsWith('+') && (digits.length===10 || digits.length===11) ? '+55'+digits : '+'+digits;
+  if (!brazilWhatsAppNumberRegex.test(number)) throw new Error('Informe um número móvel brasileiro com DDD válido e oito ou nove dígitos.');
   return number;
 }
 
@@ -18,7 +19,7 @@ export function normalizeWhatsAppSender(value) {
   const address = value.slice('whatsapp:'.length);
   if (!/^\+\d+$/.test(address)) return invalid('from_characters_invalid');
   if (!address.startsWith('+55')) return invalid('from_country_invalid');
-  if (address.length !== 14) return invalid('from_length_invalid');
-  if (!/^\+55[1-9]\d9\d{8}$/.test(address)) return invalid('from_mobile_format_invalid');
+  if (![13,14].includes(address.length)) return invalid('from_length_invalid');
+  if (!brazilWhatsAppNumberRegex.test(address)) return invalid('from_mobile_format_invalid');
   return normalizeWhatsAppNumber(address);
 }

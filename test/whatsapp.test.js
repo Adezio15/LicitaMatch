@@ -246,20 +246,23 @@ test('diagnósticos do webhook distinguem rejeições sem expor dados sensíveis
 });
 
 
-test('remetentes brasileiros usam E.164 canônico com nove dígitos',()=>{
+test('remetentes brasileiros preservam oito ou nove dígitos',()=>{
  for(const [address,canonical] of [
   ['whatsapp:+5584999999999','+5584999999999'],
   ['whatsapp:+5511987654321','+5511987654321'],
-  ['whatsapp:+5521967654321','+5521967654321']
+  ['whatsapp:+5521967654321','+5521967654321'],
+  ['whatsapp:+558499999999','+558499999999'],
+  ['whatsapp:+551187654321','+551187654321']
  ]) assert.equal(normalizeWhatsAppSender(address),canonical);
  for(const value of [undefined,null,[],['whatsapp:+5584999999999'],'whatsapp:+','whatsapp: 5584999999999',
   'whatsapp:%2B5584999999999','whatsapp:%252B5584999999999','whatsapp:+5584 99999-9999',
   ' whatsapp:+5584999999999','whatsapp:+5584999999999 ','whatsapp:++5584999999999',
   'whatsapp:+15555555555','whatsapp:+558433334444','whatsapp:+5509999999999',
-  'whatsapp:+5584888888888','whatsapp:+558499999999','whatsapp:+551187654321','whatsapp:+55849999999','whatsapp:+55849999999999'])
+  'whatsapp:+5584888888888','whatsapp:+5523999999999','whatsapp:+552399999999','whatsapp:+55849999999','whatsapp:+55849999999999'])
   assert.throws(()=>normalizeWhatsAppSender(value));
- // Account preferences and outbound alerts still require a nine-digit mobile.
- assert.throws(()=>normalizeWhatsAppNumber('+558499999999'));
+ assert.equal(normalizeWhatsAppNumber('+558499999999'),'+558499999999');
+ assert.equal(normalizeWhatsAppNumber('(84) 9999-9999'),'+558499999999');
+ assert.equal(normalizeWhatsAppNumber('(84) 99999-9999'),'+5584999999999');
 });
 
 test('formulário preserva + codificado, rejeita dupla codificação e valida assinatura antes de normalizar',async()=>{
@@ -312,7 +315,38 @@ test('motivos de remetente inválido são códigos fixos sem número ou conteúd
  for(const [value,code] of [
   [undefined,'from_not_string'],[['whatsapp:+5584999999999'],'from_duplicated'],
   ['whatsapp: 5584999999999','from_prefix_invalid'],['whatsapp:+5584 999999999','from_characters_invalid'],
-  ['whatsapp:+15555555555','from_country_invalid'],['whatsapp:+558499999999','from_length_invalid'],
+  ['whatsapp:+15555555555','from_country_invalid'],['whatsapp:+55849999999','from_length_invalid'],
   ['whatsapp:+5584888888888','from_mobile_format_invalid']
  ]) assert.throws(()=>normalizeWhatsAppSender(value),error=>error.code===code && !error.message.includes('5584'));
+});
+
+
+test('número com oito dígitos exige lista e cadastro exatos, consentimento e elegibilidade',async()=>{
+ const {db,database}=await fixture();
+ const short='+558499999999';
+ const cfg=parseEnv({...base,...config,WHATSAPP_ENABLED:'false',WHATSAPP_SANDBOX_NUMBERS:short});
+ const app=createApp({config:cfg,database,logger});
+ const body={AccountSid:cfg.TWILIO_ACCOUNT_SID,To:cfg.TWILIO_WHATSAPP_FROM,From:'whatsapp:'+short,MessageSid:sid,Body:'Olá'};
+ const post=(data=body)=>request(app).post('/api/whatsapp/webhook').type('form').set('X-Twilio-Signature',twilio.getExpectedTwilioSignature(cfg.TWILIO_AUTH_TOKEN,cfg.WHATSAPP_WEBHOOK_URL,data)).send(data);
+ try {
+  // No inferred alias for the existing nine-digit registered number.
+  assert.ok(!(await post().expect(200)).text.includes('<Message>'));
+  await db.query('UPDATE usuarios SET whatsapp_numero=$1',[short]);
+  assert.ok((await post().expect(200)).text.includes('<Message>'));
+  assert.equal((await db.query('SELECT numero FROM whatsapp_inbound')).rows[0].numero,short);
+  assert.ok(!(await post({...body,From:'whatsapp:'+payload.to,MessageSid:'SM'+'2'.repeat(32)}).expect(200)).text.includes('<Message>'));
+  const sent=[];
+  const service=createWhatsAppService({config:{...cfg,WHATSAPP_ENABLED:'true'},client:{messages:{create:async data=>{sent.push(data);return {sid};}}}});
+  await service.sendMatchAlert({...payload,to:short});
+  assert.equal(sent[0].to,'whatsapp:'+short);
+  await assert.rejects(createWhatsAppService({config:cfg,client:{messages:{create:async()=>{throw new Error('must not send');}}}}).sendMatchAlert({...payload,to:short}),/desativado/);
+  for(const change of ["UPDATE usuarios SET alertas_whatsapp=false,whatsapp_consentimento_em=NULL", "UPDATE usuarios SET alertas_whatsapp=true,whatsapp_consentimento_em=now(),ativo=false", "UPDATE usuarios SET ativo=true; UPDATE empresas SET status='inativo'", "UPDATE empresas SET status='ativo',plano='pro'"]) {
+   await db.exec(change);
+   assert.ok(!(await post({...body,MessageSid:'SM'+'3'.repeat(32)}).expect(200)).text.includes('<Message>'));
+  }
+  for(const invalid of ['+552399999999','+558433334444','+5584888888888']) {
+   await assert.rejects(db.query('UPDATE usuarios SET whatsapp_numero=$1',[invalid]));
+   assert.throws(()=>parseEnv({...base,...config,WHATSAPP_SANDBOX_NUMBERS:invalid}));
+  }
+ } finally {await app.locals.sessionStore.close();await db.close();}
 });

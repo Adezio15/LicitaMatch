@@ -111,7 +111,7 @@ Os logs da aplicação usam `event=whatsapp.webhook.decision`, `requestId`, `sta
 | 403 | signature_invalid | Conferir Auth Token da conta/subconta, URL HTTPS exata na Twilio e todos os parâmetros do formulário |
 | 403 | account_sid_mismatch | TWILIO_ACCOUNT_SID deve pertencer ao Sandbox que chamou a aplicação |
 | 403 | recipient_mismatch | TWILIO_WHATSAPP_FROM deve ser whatsapp:+ seguido do número do Sandbox, não o celular de teste |
-| 400 | message_sid_invalid / sender_invalid | MessageSid e remetente precisam ter formato válido; celular brasileiro com DDD e nove dígitos |
+| 400 | message_sid_invalid / sender_invalid | MessageSid e remetente precisam ter formato válido; número móvel brasileiro com DDD válido e oito ou nove dígitos |
 | 415 | unsupported_content_type | Usar POST application/x-www-form-urlencoded |
 | 503 | auth_token_missing / database_failure | Verificar configuração ou banco; falha SQL usa event=whatsapp.webhook.failed |
 | 200 | webhook_disabled / sandbox_number_not_allowed / sender_not_eligible / duplicate_message | TwiML vazio, sem resposta WhatsApp |
@@ -125,8 +125,12 @@ Somente horários e status dos Network Logs não permitem determinar qual valida
 
 ## Formato do remetente brasileiro
 
-O webhook exige `From` único no formato `whatsapp:+55DDDNUMERO`, sem espaços, pontuação ou escapes ainda codificados: 13 dígitos após o +, DDD com primeiro dígito diferente de zero e celular com nove dígitos começando em 9. O resultado precisa coincidir com WHATSAPP_SANDBOX_NUMBERS e com o cadastro autorizado. Nenhum dígito é acrescentado ou removido do endereço recebido.
+O webhook exige `From` único no formato `whatsapp:+55DDDNUMERO`, sem espaços, pontuação ou escapes ainda codificados: 12 ou 13 dígitos após o +, DDD brasileiro válido e número local de nove dígitos começando em 9 ou representação móvel de oito dígitos começando em 6–9. O resultado precisa coincidir com WHATSAPP_SANDBOX_NUMBERS e com o cadastro autorizado. Nenhum dígito é acrescentado ou removido do endereço recebido.
 
 No corpo application/x-www-form-urlencoded, `%2B` vira `+` uma única vez; um `+` literal vira espaço. Não há decodeURIComponent adicional, substituição de espaço por `+` nem alteração de req.body antes da assinatura. Campos From duplicados, escapes duplos e formatos inválidos são rejeitados.
 
 Quando reason=sender_invalid, o campo senderReason identifica a causa sem expor dados: from_duplicated, from_not_string, from_prefix_invalid, from_characters_invalid, from_country_invalid, from_length_invalid ou from_mobile_format_invalid. O diagnóstico ocorre somente depois da assinatura válida. Ter 13 dígitos não garante que prefixo, DDD e indicador inicial 9 do celular sejam válidos. Para identificar a causa de uma chamada específica, consulte esse código após publicação manual; o log anterior sender_invalid não contém detalhe suficiente.
+
+A migration 018_whatsapp_number_formats.sql permite cadastrar a representação com oito dígitos sem alterar registros existentes. Deve ser aplicada pelo processo habitual antes do teste; não foi aplicada no Railway nesta alteração. Para evitar associação ambígua, não há equivalência automática entre oito e nove dígitos: o From, WHATSAPP_SANDBOX_NUMBERS e o número salvo na conta com consentimento devem corresponder exatamente. Se a representação mudar, o responsável deve salvar a nova preferência e confirmar novamente o consentimento. Somente receber uma mensagem não altera cadastro ou consentimento.
+
+A regra restrita é compartilhada entre validador, configuração e elegibilidade SQL. Rejeita DDD inexistente, números fixos, país diferente, comprimento incorreto, duplicados e caracteres extras. A migração preserva dados históricos usando NOT VALID: escritas novas são validadas, sem reescrever registros antigos. WHATSAPP_ENABLED=false continua bloqueando todos os alertas automáticos.

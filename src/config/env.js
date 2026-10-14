@@ -1,3 +1,4 @@
+import { brazilWhatsAppNumberRegex } from '../services/brazilWhatsAppNumber.js';
 import dotenv from 'dotenv';
 import { emailProvider, emailFields } from './email.js';
 import { z } from 'zod';
@@ -66,7 +67,7 @@ const schema = z.object({
   TWILIO_WHATSAPP_CONTENT_SID: z.string().regex(/^HX[0-9a-fA-F]{32}$/).optional(),
   WHATSAPP_WEBHOOK_URL: z.string().url().default('https://licitamatch.online/api/whatsapp/webhook'),
   WHATSAPP_MODE: z.enum(['sandbox','production']).default('sandbox'),
-  WHATSAPP_SANDBOX_NUMBERS: z.string().default('').refine(value => !value || value.split(',').every(n => /^\+55[1-9]\d9\d{8}$/.test(n.trim()))),
+  WHATSAPP_SANDBOX_NUMBERS: z.string().default('').refine(value => !value || value.split(',').every(n => brazilWhatsAppNumberRegex.test(n.trim()))),
   WHATSAPP_PRODUCTION_READY: z.enum(['true','false']).default('false'),
   ADMIN_EMAIL: z.preprocess(value => typeof value === 'string' && !value.trim() ? undefined : value, z.string().trim().email().optional()),
   EMAIL_FROM: z.string().email().optional(),

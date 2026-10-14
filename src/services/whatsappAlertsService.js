@@ -1,7 +1,8 @@
+import { brazilWhatsAppNumberPattern } from './brazilWhatsAppNumber.js';
 import { sandboxAllowed } from './twilioWhatsAppService.js';
 
 // Central authorization gate preserves the current Premium policy; future plans can be added here.
-export const whatsappEligibilitySql = "e.status='ativo' AND plano_efetivo(e)='premium' AND u.ativo AND u.tipo IN ('gestor','admin') AND u.alertas_whatsapp AND u.whatsapp_consentimento_em IS NOT NULL AND u.whatsapp_numero ~ '^\\+55[1-9][0-9]9[0-9]{8}$'";
+export const whatsappEligibilitySql = "e.status='ativo' AND plano_efetivo(e)='premium' AND u.ativo AND u.tipo IN ('gestor','admin') AND u.alertas_whatsapp AND u.whatsapp_consentimento_em IS NOT NULL AND u.whatsapp_numero ~ '"+brazilWhatsAppNumberPattern+"'";
 
 export async function sendWhatsAppAlerts({ client, config, service, logger, stopped = () => false }) {
   if (config.WHATSAPP_ENABLED !== 'true') return {sent:0,failed:0};
