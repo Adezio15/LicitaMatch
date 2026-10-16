@@ -5,10 +5,14 @@
   <form method="post" action="/cadastro" data-cnpj-form class="panel stack">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <h2>Dados da empresa</h2>
+    <div class="cnpj-lookup-row">
+      <label>CNPJ<input name="cnpj" autocapitalize="characters" placeholder="00.000.000/0000-00" maxlength="18" required></label>
+      <button type="button" class="button secondary" data-cnpj-lookup>Consultar</button>
+    </div>
+    <p data-cnpj-status role="status" aria-live="polite"></p>
     <div class="grid two">
       <label>Razão social<input name="razao_social" autocomplete="organization" maxlength="200" required></label>
       <label>Nome fantasia <span class="optional">(opcional)</span><input name="nome_fantasia" maxlength="200"></label>
-      <label>CNPJ<input name="cnpj" autocapitalize="characters" placeholder="00.000.000/0000-00" maxlength="18" required></label>
       <label>E-mail da empresa<input type="email" name="email_empresa" maxlength="254" required></label>
       <label>Telefone <span class="optional">(opcional)</span><input type="tel" name="telefone" autocomplete="tel" maxlength="30"></label>
       <label>Cidade <span class="optional">(opcional)</span><input name="cidade" autocomplete="address-level2" maxlength="100"></label>
@@ -19,8 +23,6 @@
       <label><%= label %><input name="<%= name %>" maxlength="<%= max %>"></label>
       <% } %>
     </div>
-    <button type="button" class="button secondary" data-cnpj-lookup>Consultar CNPJ</button>
-    <p data-cnpj-status role="status" aria-live="polite"></p>
     <hr><h2>Seu acesso</h2>
     <label>Seu nome<input name="nome" autocomplete="name" maxlength="150" required></label>
     <label>Seu e-mail de acesso<input type="email" name="email" autocomplete="username" maxlength="254" required></label>

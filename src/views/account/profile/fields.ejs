@@ -6,6 +6,8 @@
     <button type="button" class="button secondary small" data-add-tag>+ Adicionar palavra</button>
   </div>
   <% } else { %>
+  <% const lookup = field.name === 'cnpj' && typeof cnpjLookup !== 'undefined' && cnpjLookup; %>
+  <% if (lookup) { %><div class="cnpj-lookup-row"><% } %>
   <label class="<%= field.type === 'checkbox' ? 'checkbox' : '' %>">
     <%= field.label %>
     <% if (field.type === 'textarea') { %>
@@ -21,5 +23,6 @@
     <% } %>
     <% if (field.help) { %><small class="muted"><%= field.help %></small><% } %>
   </label>
+  <% if (lookup) { %><button type="button" class="button secondary" data-cnpj-lookup>Consultar</button></div><% } %>
   <% } %>
 <% } %>

@@ -6,14 +6,12 @@ for (const form of document.querySelectorAll('[data-cnpj-form], form[data-sectio
   const status = form.querySelector('[data-cnpj-status]');
   const normalize = value => value.trim().toUpperCase().replace(/[.\/-]/g, '');
   let generation = 0;
-  let last = '';
   form.addEventListener('input', () => { generation++; });
   async function lookup() {
     const cnpj = normalize(input.value);
     if (!/^[A-Z0-9]{12}\d{2}$/.test(cnpj)) { status.textContent = 'Informe um CNPJ completo, numérico ou alfanumérico.'; return; }
     const revision = generation;
     button.disabled = true;
-    last = cnpj;
     status.textContent = 'Consultando BrasilAPI…';
     try {
       const response = await fetch('/api/empresas/consulta-cnpj', {
@@ -64,8 +62,4 @@ for (const form of document.querySelectorAll('[data-cnpj-form], form[data-sectio
     } finally { button.disabled = false; }
   }
   button.addEventListener('click', lookup);
-  input.addEventListener('blur', () => {
-    const value = normalize(input.value);
-    if (value !== last && /^[A-Z0-9]{12}\d{2}$/.test(value) && !button.disabled) lookup();
-  });
 }

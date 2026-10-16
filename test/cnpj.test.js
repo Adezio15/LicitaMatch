@@ -84,6 +84,7 @@ test('formulário preserva edições locais e exige confirmação para perfil sa
     return {controls,status,listeners,resolve:()=>resolve({ok:true,json:async()=>({razao_social:'Consulta externa',cidade:'Natal'})})};
   }
   const registration = await setup();
+  assert.equal(registration.listeners.cnpjblur, undefined, 'Sair do CNPJ não deve iniciar consulta nem bloquear o clique em Consultar');
   let pending = registration.listeners.click();registration.resolve();await pending;
   assert.equal(registration.controls.razao_social.value,'Digitada pelo usuário');
   assert.equal(registration.controls.cidade.value,'Natal');
@@ -95,6 +96,8 @@ test('formulário preserva edições locais e exige confirmação para perfil sa
   pending=stale.listeners.click();stale.listeners.input();stale.resolve();await pending;
   assert.equal(stale.controls.cidade.value,'');
   assert.match(stale.status.textContent,/formulário mudou/);
+  pending=stale.listeners.click();stale.resolve();await pending;
+  assert.equal(stale.controls.cidade.value,'Natal', 'Consultar novamente deve aplicar os dados após uma edição');
   const accepted=await setup(true,true);
   pending=accepted.listeners.click();accepted.resolve();await pending;
   assert.equal(accepted.controls.razao_social.value,'Consulta externa');

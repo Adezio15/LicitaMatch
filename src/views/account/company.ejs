@@ -14,7 +14,7 @@
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <fieldset <%= editable ? '' : 'disabled' %>>
         <% if(section.fields) { const values = section.id === 'empresa' ? {...company,email_empresa:company.email} : section.id === 'comercial' ? profile.comercial : profile; %>
-          <div class="grid two"><%- include('profile/fields', {fields:section.fields,values,groupName:''}) %></div>
+          <div class="grid two"><%- include('profile/fields', {fields:section.fields,values,groupName:'',cnpjLookup:section.id === 'empresa' && editable}) %></div>
         <% } %>
         <% for (const group of section.groups || []) { %>
         <section class="profile-group" data-group="<%= group.name %>"><h3><%= group.title %></h3>
@@ -25,7 +25,6 @@
           <% if(editable) { %><button type="button" class="button secondary" data-add-row>+ <%= group.add %></button><% } %>
         </section><% } %>
         <% if (section.id === 'empresa' && editable) { %>
-        <button type="button" class="button secondary" data-cnpj-lookup>Consultar CNPJ</button>
         <p data-cnpj-status role="status" aria-live="polite"></p>
         <% } %>
       </fieldset>
