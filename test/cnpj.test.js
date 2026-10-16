@@ -4,7 +4,7 @@ import { cnpjSchema, validCnpj, registerSchema } from '../src/utils/validation.j
 import { cnpjService } from '../src/services/cnpjService.js';
 
 const cnpj = '11222333000181';
-const payload = { cnpj, razao_social:' Empresa teste ', nome_fantasia:'Fantasia', descricao_situacao_cadastral:'ATIVA', municipio:'Natal', uf:'RN', cep:'59000-000', logradouro:'Rua A', descricao_tipo_de_logradouro:'RUA', numero:'1', cnae_fiscal:4751201, cnae_fiscal_descricao:'Comércio', ddd_telefone_1:'84999999999' };
+const payload = { razao_social:' Empresa teste ', estabelecimento: { cnpj, nome_fantasia:'Fantasia', situacao_cadastral:'02', cidade:{nome:'Natal'}, estado:{sigla:'RN'}, cep:'59000-000', logradouro:'Rua A', tipo_logradouro:'RUA', numero:'1', atividade_principal:{id:'4751201',descricao:'Comércio'}, ddd1:'84', telefone1:'999999999', email:'CONTATO@EXAMPLE.TEST' } };
 const response = (status = 200, data = payload) => ({ status, ok: status === 200, json: async () => data });
 
 test('CNPJ numérico e alfanumérico: formato, normalização e dígitos oficiais', () => {
@@ -20,7 +20,7 @@ test('normaliza, deduplica consultas, usa cache e expira sem consultar o banco',
   let now = 0;
   const service = cnpjService({ now:()=>now, ttlMs:100, fetchImpl:async (url, options)=>{
     calls++;
-    assert.equal(url, `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+    assert.equal(url, `https://publica.cnpj.ws/cnpj/${cnpj}`);
     assert.ok(options.signal);
     return response();
   } });
@@ -31,6 +31,11 @@ test('normaliza, deduplica consultas, usa cache e expira sem consultar o banco',
   assert.equal(a.cep,'59000000');
   assert.equal(a.cnae_principal,'4751201');
   assert.equal(a.situacao_cadastral,'ATIVA');
+  assert.equal(a.telefone,'84999999999');
+  assert.equal(a.email_empresa,'contato@example.test');
+  assert.equal(a.cidade,'Natal');
+  assert.equal(a.estado,'RN');
+  assert.equal(a.logradouro,'RUA Rua A');
   assert.equal((await service.lookup(cnpj)).cached,true);
   now=101;
   await service.lookup(cnpj);
@@ -47,7 +52,7 @@ test('valida antes de consultar, distingue erros e não armazena falhas em cache
     await assert.rejects(service.lookup(cnpj),{status:expected});
     assert.equal(calls,2);
   }
-  for (const data of [null,{}, {...payload,cnpj:'11444777000161'}, {...payload,razao_social:''}]) {
+  for (const data of [null,{}, {...payload,estabelecimento:{...payload.estabelecimento,cnpj:'11444777000161'}}, {...payload,razao_social:''}]) {
     await assert.rejects(cnpjService({fetchImpl:async()=>response(200,data)}).lookup(cnpj),{status:502});
   }
   await assert.rejects(cnpjService({fetchImpl:async()=>{throw new Error('network');}}).lookup(cnpj),{status:502});
@@ -62,7 +67,7 @@ test('timeout e limite de consultas simultâneas', async () => {
 
 test('cache tem tamanho limitado', async () => {
   let calls=0;
-  const service=cnpjService({maxEntries:1,fetchImpl:async url=>{calls++;return response(200,{...payload,cnpj:url.split('/').at(-1)});}});
+  const service=cnpjService({maxEntries:1,fetchImpl:async url=>{calls++;return response(200,{...payload,estabelecimento:{...payload.estabelecimento,cnpj:url.split('/').at(-1)}});}});
   await service.lookup(cnpj);
   await service.lookup('11444777000161');
   await service.lookup(cnpj);

@@ -34,7 +34,7 @@ test('perfil completo: migração preserva dados, persistência, isolamento, per
   let registryCalls = 0;
   globalThis.fetch = async () => {
     registryCalls++;
-    return {ok:true,status:200,json:async()=>({cnpj:'11222333000181',razao_social:'Dados públicos externos',descricao_situacao_cadastral:'ATIVA',cep:'59000000',municipio:'Natal',uf:'RN',cnae_fiscal:4751201,cnae_fiscal_descricao:'Informática'})};
+    return {ok:true,status:200,json:async()=>({razao_social:'Dados públicos externos',estabelecimento:{cnpj:'11222333000181',situacao_cadastral:'02',cep:'59000000',cidade:{nome:'Natal'},estado:{sigla:'RN'},atividade_principal:{id:'4751201',descricao:'Informática'}}})};
   };
   let app;
   try { app = createApp({config,database,logger}); } finally { globalThis.fetch = originalFetch; }

@@ -12,7 +12,7 @@ for (const form of document.querySelectorAll('[data-cnpj-form], form[data-sectio
     if (!/^[A-Z0-9]{12}\d{2}$/.test(cnpj)) { status.textContent = 'Informe um CNPJ completo, numérico ou alfanumérico.'; return; }
     const revision = generation;
     button.disabled = true;
-    status.textContent = 'Consultando BrasilAPI…';
+    status.textContent = 'Consultando CNPJ.ws…';
     try {
       const response = await fetch('/api/empresas/consulta-cnpj', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': form.elements._csrf.value },
@@ -22,7 +22,7 @@ for (const form of document.querySelectorAll('[data-cnpj-form], form[data-sectio
       if (!response.ok) throw new Error(data.error || 'Não foi possível consultar o CNPJ.');
       if (generation !== revision || normalize(input.value) !== cnpj) { status.textContent = 'O formulário mudou durante a consulta. Consulte novamente para aplicar os dados.'; return; }
       const existing = form.dataset.section === 'empresa';
-      if (existing && !window.confirm('Aplicar os dados da BrasilAPI ao formulário e ao CNAE principal? Revise as alterações e salve cada seção para confirmar.')) { status.textContent = 'Dados atuais preservados.'; return; }
+      if (existing && !window.confirm('Aplicar os dados do CNPJ.ws ao formulário e ao CNAE principal? Revise as alterações e salve cada seção para confirmar.')) { status.textContent = 'Dados atuais preservados.'; return; }
       let skipped = false;
       for (const [name, value] of Object.entries(data)) {
         if (name === 'cnpj' || !value) continue;
