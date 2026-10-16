@@ -30,7 +30,14 @@ test('perfil completo: migração preserva dados, persistência, isolamento, per
   await db.exec(migrations.find(m=>m.name.startsWith('015_')).sql);
   assert.equal((await db.query("SELECT razao_social FROM empresas WHERE cnpj='12345678000195'")).rows[0].razao_social,'Legada');
   const database = { query:(sql,params)=>db.query(sql,params), connect:async()=>({query:(sql,params)=>db.query(sql,params),release(){}}) };
-  const app = createApp({config,database,logger});
+  const originalFetch = globalThis.fetch;
+  let registryCalls = 0;
+  globalThis.fetch = async () => {
+    registryCalls++;
+    return {ok:true,status:200,json:async()=>({cnpj:'11222333000181',razao_social:'Dados públicos externos',descricao_situacao_cadastral:'ATIVA',cep:'59000000',municipio:'Natal',uf:'RN',cnae_fiscal:4751201,cnae_fiscal_descricao:'Informática'})};
+  };
+  let app;
+  try { app = createApp({config,database,logger}); } finally { globalThis.fetch = originalFetch; }
   const register = async (email,cnpj) => {
     const agent = request.agent(app);
     const csrf = (await agent.get('/api/auth/csrf')).body.csrfToken;
@@ -40,6 +47,45 @@ test('perfil completo: migração preserva dados, persistência, isolamento, per
   try {
     const a = await register('perfil-a@example.test','11222333000181');
     const b = await register('perfil-b@example.test','11444777000161');
+    await t.test('consulta protegida por CSRF, cache e limite; não altera empresa nem atividades', async () => {
+      await db.query("UPDATE usuarios SET tipo='usuario' WHERE id=$1",[b.user.id]);
+      await b.agent.post('/api/empresas/consulta-cnpj').set('X-CSRF-Token',b.csrf).send({cnpj:'11222333000181'}).expect(403);
+      await db.query("UPDATE usuarios SET tipo='gestor' WHERE id=$1",[b.user.id]);
+      const anonymous = request.agent(app);
+      const anonCsrf = (await anonymous.get('/api/auth/csrf')).body.csrfToken;
+      await anonymous.post('/api/empresas/consulta-cnpj').set('X-CSRF-Token',anonCsrf).send({cnpj:'11222333000181'}).expect(200);
+      const before = (await a.agent.get('/api/empresa/perfil')).body;
+      await a.agent.post('/api/empresas/consulta-cnpj').send({cnpj:'11222333000181'}).expect(403);
+      const lookup = () => a.agent.post('/api/empresas/consulta-cnpj').set('X-CSRF-Token',a.csrf).send({cnpj:'11.222.333/0001-81'});
+      const first = await lookup().expect(200);
+      assert.equal(first.body.razao_social,'Dados públicos externos');
+      assert.equal((await lookup().expect(200)).body.cached,true);
+      assert.equal(registryCalls,1);
+      assert.deepEqual((await a.agent.get('/api/empresa/perfil')).body,before);
+      for(let i=0;i<7;i++) await lookup().expect(200);
+      await lookup().expect(429);
+    });
+    await t.test('cadastro alfanumérico persiste endereço e CNAE revisados', async () => {
+      const agent = request.agent(app);
+      const token = (await agent.get('/api/auth/csrf')).body.csrfToken;
+      await agent.post('/api/auth/register').set('X-CSRF-Token',token).send({cnpj:'12.abc.345/01de-35',razao_social:'Empresa revisada',email_empresa:'alfa@example.test',nome:'Gestor',email:'alfa@example.test',senha:'Senha-segura-2026!',logradouro:'Rua revisada',cep:'59000-000',cnae_principal:'4751201',cnae_descricao:'Descrição revisada'}).expect(201);
+      const {body} = await agent.get('/api/empresa/perfil').expect(200);
+      assert.equal(body.company.cnpj,'12ABC34501DE35');
+      assert.equal(body.company.logradouro,'Rua revisada');
+      assert.equal(body.company.cep,'59000000');
+      assert.equal(body.profile.atividades[0].descricao,'Descrição revisada');
+      assert.equal(body.profile.atividades[0].tipo,'principal');
+    });
+    await t.test('novos campos persistem e clientes antigos não apagam endereço salvo', async () => {
+      const data = {cnpj:'11222333000181',razao_social:'Empresa teste',email_empresa:'perfil-a@example.test'};
+      await a.agent.patch('/api/empresa/perfil/empresa').set('X-CSRF-Token',a.csrf).send({...data,logradouro:'Rua teste',numero:'12',complemento:'Sala 1',bairro:'Centro',cep:'59000-000',situacao_cadastral:'ATIVA'}).expect(200);
+      await a.agent.patch('/api/empresa/perfil/empresa').set('X-CSRF-Token',a.csrf).send(data).expect(200);
+      const {body} = await a.agent.get('/api/empresa/perfil');
+      assert.equal(body.company.logradouro,'Rua teste');
+      assert.equal(body.company.cep,'59000000');
+      assert.equal(body.company.situacao_cadastral,'ATIVA');
+      assert.equal(body.company.status,'ativo');
+    });
     const save = (section,data,status=200) => a.agent.patch('/api/empresa/perfil/'+section).set('X-CSRF-Token',a.csrf).send(data).expect(status);
     await t.test('valida CNPJ na edição e impede duplicidade sem perder dados', async()=>{
       const data = {cnpj:'11.222.333/0001-81',razao_social:'Empresa completa',email_empresa:'empresa@example.test',telefone:'84999999999',cidade:'Natal',estado:'RN'};

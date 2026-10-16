@@ -2,18 +2,25 @@
 <main class="page narrow">
   <%- include('../partials/logo', { href: '/login' }) %>
   <header class="page-heading"><span class="eyebrow">COMECE POR AQUI</span><h1>Cadastre sua empresa</h1><p class="muted">Você será o primeiro gestor da conta e poderá adicionar sua equipe.</p></header>
-  <form method="post" action="/cadastro" class="panel stack">
+  <form method="post" action="/cadastro" data-cnpj-form class="panel stack">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <h2>Dados da empresa</h2>
     <div class="grid two">
       <label>Razão social<input name="razao_social" autocomplete="organization" maxlength="200" required></label>
       <label>Nome fantasia <span class="optional">(opcional)</span><input name="nome_fantasia" maxlength="200"></label>
-      <label>CNPJ<input name="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00" maxlength="18" required></label>
+      <label>CNPJ<input name="cnpj" autocapitalize="characters" placeholder="00.000.000/0000-00" maxlength="18" required></label>
       <label>E-mail da empresa<input type="email" name="email_empresa" maxlength="254" required></label>
       <label>Telefone <span class="optional">(opcional)</span><input type="tel" name="telefone" autocomplete="tel" maxlength="30"></label>
       <label>Cidade <span class="optional">(opcional)</span><input name="cidade" autocomplete="address-level2" maxlength="100"></label>
       <label>Estado <span class="optional">(opcional)</span><select name="estado"><option value="">Selecione</option><% for (const state of states) { %><option><%= state %></option><% } %></select></label>
     </div>
+    <div class="grid two">
+      <% for (const [name,label,max] of [['situacao_cadastral','Situação cadastral',100],['logradouro','Logradouro',200],['numero','Número',30],['complemento','Complemento',200],['bairro','Bairro',100],['cep','CEP',9],['cnae_principal','CNAE principal',7],['cnae_descricao','Descrição do CNAE principal',1000]]) { %>
+      <label><%= label %><input name="<%= name %>" maxlength="<%= max %>"></label>
+      <% } %>
+    </div>
+    <button type="button" class="button secondary" data-cnpj-lookup>Consultar CNPJ</button>
+    <p data-cnpj-status role="status" aria-live="polite"></p>
     <hr><h2>Seu acesso</h2>
     <label>Seu nome<input name="nome" autocomplete="name" maxlength="150" required></label>
     <label>Seu e-mail de acesso<input type="email" name="email" autocomplete="username" maxlength="254" required></label>
@@ -23,4 +30,5 @@
     <a class="center" href="/login">Já tenho uma conta</a>
   </form>
 </main>
+<script src="/assets/cnpj-lookup.js" defer></script>
 <%- include('../partials/footer') %>

@@ -1,3 +1,4 @@
+import { cnpjService } from '../services/cnpjService.js';
 import { profileSections } from '../utils/companyProfileFields.js';
 import { states } from '../utils/validation.js';
 import { premiumTrialService } from '../services/premiumTrialService.js';
@@ -12,6 +13,8 @@ import { opportunityRoutes } from './opportunityRoutes.js';
 
 export function accountRoutes(database, config, logger) {
   const router = Router();
+  const registry = cnpjService();
+  const lookupLimit = rateLimit({ windowMs: 60000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Limite de consultas atingido. Aguarde um minuto.' } });
   const service = accountService(database);
   const controller = accountController(service, config);
   const loginLimit = rateLimit({ windowMs: 15 * 60000, limit: 10, skipSuccessfulRequests: true,
@@ -21,6 +24,10 @@ export function accountRoutes(database, config, logger) {
 
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(loadUser(service.repository, config), csrf);
+  router.post('/api/empresas/consulta-cnpj', (req, res, next) => {
+    if (req.user) return requireManager(req, res, next);
+    next();
+  }, lookupLimit, async (req, res) => res.json(await registry.lookup(req.body.cnpj)));
   const trials = premiumTrialService(database, config, logger);
   router.post(['/conta/teste-premium','/api/testes-premium'], requireAuth, async (req,res) => {
     const result = await trials.request(req.user,{ip:req.ip,userAgent:(req.get('user-agent') || '').slice(0,2000)});

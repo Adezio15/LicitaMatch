@@ -58,9 +58,6 @@ if (page) {
   }
   page.addEventListener('input', event => {
     const control = event.target;
-    if (control.matches('[data-mask="cnpj"]')) {
-      control.value = control.value.replace(/\D/g,'').slice(0,14).replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2');
-    }
     if (control.matches('[data-tag-input]')) control.setCustomValidity('');
     if (control.matches('[data-state-search]')) {
       const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -96,8 +93,8 @@ if (page) {
     syncRegion(form);
     // Apply the existing CNPJ mask on initial render without marking the form dirty.
     form.querySelectorAll('[data-mask="cnpj"]').forEach(control => {
-      const digits = control.value.replace(/\D/g,'');
-      if (digits.length === 14) control.value = digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+      const digits = control.value.toUpperCase().replace(/[.\/-]/g,'');
+      if (digits.length === 14) control.value = digits.replace(/^([A-Z0-9]{2})([A-Z0-9]{3})([A-Z0-9]{3})([A-Z0-9]{4})(\d{2})$/, '$1.$2.$3/$4-$5');
     });
     form.addEventListener('submit', async event => {
       event.preventDefault();

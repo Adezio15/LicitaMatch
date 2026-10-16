@@ -5,7 +5,8 @@ const options = values => values.map(value => [value,value]);
 const unit = field('unidade','Unidade de medida','text',{ list: 'profile-units', max: 80 });
 export const profileSections = [
   { id: 'empresa', title: 'Empresa', description: 'Identificação e contatos da sua empresa.', fields: [
-    field('cnpj','CNPJ','text',{ required: true, max: 18, mask: 'cnpj' }), field('razao_social','Razão social','text',{required:true}), field('nome_fantasia','Nome fantasia'), field('email_empresa','E-mail','email',{required:true,max:254}), field('telefone','Telefone','tel',{max:30}), field('cidade','Cidade','text',{max:100}), select('estado','Estado',[['','Selecione'],...options(states)])
+    field('cnpj','CNPJ','text',{ required: true, max: 18, mask: 'cnpj' }), field('razao_social','Razão social','text',{required:true}), field('nome_fantasia','Nome fantasia'), field('email_empresa','E-mail','email',{required:true,max:254}), field('telefone','Telefone','tel',{max:30}), field('cidade','Cidade','text',{max:100}), select('estado','Estado',[['','Selecione'],...options(states)]),
+    field('situacao_cadastral','Situação cadastral','text',{max:100}),field('logradouro','Logradouro','text',{max:200}),field('numero','Número','text',{max:30}),field('complemento','Complemento','text',{max:200}),field('bairro','Bairro','text',{max:100}),field('cep','CEP','text',{max:9})
   ]},
   { id: 'atividades', title: 'Atividades', description: 'Separe os CNAEs cadastrados das atividades que a empresa realmente exerce.', groups: [
     { name: 'atividades', title: 'CNAEs e atividades efetivamente exploradas', add: 'Adicionar atividade', fields: [select('tipo','Tipo',[['principal','CNAE principal'],['secundario','CNAE secundário'],['efetiva','Atividade efetivamente explorada']]),field('cnae','Código CNAE (7 dígitos)','text',{max:10}),field('descricao','Descrição da atividade','textarea',{required:true,max:1000})] }

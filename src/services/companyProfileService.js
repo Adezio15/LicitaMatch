@@ -39,6 +39,7 @@ export function companyProfileService(database) {
         if (!exists.rows[0]) throw new HttpError(404, 'Empresa não encontrada');
         if (section === 'empresa') {
           await client.query(`UPDATE empresas SET cnpj=$2,razao_social=$3,nome_fantasia=$4,email=$5,telefone=$6,cidade=$7,estado=$8 WHERE id=$1`, [empresaId,data.cnpj,data.razao_social,data.nome_fantasia,data.email_empresa,data.telefone,data.cidade,data.estado || null]);
+          await client.query('UPDATE empresas SET situacao_cadastral=COALESCE($2,situacao_cadastral),logradouro=COALESCE($3,logradouro),numero=COALESCE($4,numero),complemento=COALESCE($5,complemento),bairro=COALESCE($6,bairro),cep=COALESCE($7,cep) WHERE id=$1', [empresaId,data.situacao_cadastral,data.logradouro,data.numero,data.complemento,data.bairro,data.cep]);
         } else if (section === 'comercial' || section === 'atendimento') {
           await client.query('INSERT INTO empresa_perfil (empresa_id) VALUES ($1) ON CONFLICT DO NOTHING', [empresaId]);
           const columns = section === 'comercial' ? commercialColumns : ['atendimento_nacional'];

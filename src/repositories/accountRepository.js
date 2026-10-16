@@ -30,10 +30,12 @@ export function accountRepository(database) {
     },
     async createCompany(data) {
       const { rows } = await database.query(`INSERT INTO empresas
-        (razao_social, nome_fantasia, cnpj, email, telefone, cidade, estado)
-        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [data.razao_social, data.nome_fantasia, data.cnpj, data.email_empresa, data.telefone, data.cidade, data.estado || null]);
-      return rows[0];
+        (razao_social,nome_fantasia,cnpj,email,telefone,cidade,estado,situacao_cadastral,logradouro,numero,complemento,bairro,cep)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [data.razao_social,data.nome_fantasia,data.cnpj,data.email_empresa,data.telefone,data.cidade,data.estado || null,data.situacao_cadastral ?? '',data.logradouro ?? '',data.numero ?? '',data.complemento ?? '',data.bairro ?? '',data.cep ?? '']);
+      const company = rows[0];
+      if (data.cnae_principal && data.cnae_descricao) await database.query("INSERT INTO empresa_atividades (empresa_id,tipo,cnae,descricao) VALUES ($1,'principal',$2,$3)", [company.id,data.cnae_principal,data.cnae_descricao]);
+      return company;
     },
     async createUser(empresaId, data, hash) {
       const { rows } = await database.query(`INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo)
@@ -58,8 +60,10 @@ export function accountRepository(database) {
     },
     async updateCompany(empresaId, data) {
       const { rows } = await database.query(`UPDATE empresas SET razao_social=$2,nome_fantasia=$3,
-        email=$4,telefone=$5,cidade=$6,estado=$7 WHERE id=$1 RETURNING *`,
-      [empresaId, data.razao_social, data.nome_fantasia, data.email_empresa, data.telefone, data.cidade, data.estado || null]);
+        email=$4,telefone=$5,cidade=$6,estado=$7,situacao_cadastral=COALESCE($8,situacao_cadastral),
+        logradouro=COALESCE($9,logradouro),numero=COALESCE($10,numero),complemento=COALESCE($11,complemento),
+        bairro=COALESCE($12,bairro),cep=COALESCE($13,cep) WHERE id=$1 RETURNING *`,
+      [empresaId,data.razao_social,data.nome_fantasia,data.email_empresa,data.telefone,data.cidade,data.estado || null,data.situacao_cadastral,data.logradouro,data.numero,data.complemento,data.bairro,data.cep]);
       return rows[0];
     },
     async listUsers(empresaId) {

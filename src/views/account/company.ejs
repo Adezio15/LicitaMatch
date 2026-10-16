@@ -24,6 +24,10 @@
           <template><article class="profile-row"><div class="grid two"><%- include('profile/fields', {fields:group.fields,values:{},groupName:group.name}) %></div><button type="button" class="button secondary small" data-remove-row>Remover registro</button></article></template>
           <% if(editable) { %><button type="button" class="button secondary" data-add-row>+ <%= group.add %></button><% } %>
         </section><% } %>
+        <% if (section.id === 'empresa' && editable) { %>
+        <button type="button" class="button secondary" data-cnpj-lookup>Consultar CNPJ</button>
+        <p data-cnpj-status role="status" aria-live="polite"></p>
+        <% } %>
       </fieldset>
       <% if(editable) { %><div class="profile-save"><button class="button" type="submit">Salvar <%= section.title.toLowerCase() %></button><span data-save-status role="status" aria-live="polite"></span></div><% } else { %><p class="muted">Apenas gestores podem editar o perfil da empresa.</p><% } %>
     </form>
@@ -35,4 +39,5 @@
 </main>
 </div>
 <script src="/assets/company-profile.js" defer></script>
+<script src="/assets/cnpj-lookup.js" defer></script>
 <%- include('../partials/footer') %>

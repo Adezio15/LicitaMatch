@@ -8,9 +8,9 @@ export const passwordSchema = z.string().min(12, 'A senha deve ter pelo menos 12
   .refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'A senha deve ter no máximo 72 bytes');
 
 export function validCnpj(value) {
-  if (!/^\d{14}$/.test(value) || /^(\d)\1+$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^[A-Z0-9]{12}\d{2}$/.test(value) || /^(\d)\1+$/.test(value)) return false;
   const digit = (base, weights) => {
-    const rest = [...base].reduce((sum, char, i) => sum + Number(char) * weights[i], 0) % 11;
+    const rest = [...base].reduce((sum, char, i) => sum + (char.charCodeAt(0) - 48) * weights[i], 0) % 11;
     return rest < 2 ? '0' : String(11 - rest);
   };
   const base = value.slice(0, 12);
@@ -18,7 +18,19 @@ export function validCnpj(value) {
   return value.slice(12) === first + digit(base + first, [6,5,4,3,2,9,8,7,6,5,4,3,2]);
 }
 
+export const normalizeCnpj = value => value.trim().toUpperCase().replace(/[.\/-]/g, '');
+export const cnpjSchema = z.string().trim().max(18).regex(/^(?:[A-Za-z0-9]{12}\d{2}|[A-Za-z0-9]{2}\.[A-Za-z0-9]{3}\.[A-Za-z0-9]{3}\/[A-Za-z0-9]{4}-\d{2})$/, 'CNPJ inválido').transform(normalizeCnpj).refine(validCnpj, 'CNPJ inválido');
+export const companyRegistryFields = {
+  situacao_cadastral: z.string().trim().max(100).optional(),
+  logradouro: z.string().trim().max(200).optional(),
+  numero: z.string().trim().max(30).optional(),
+  complemento: z.string().trim().max(200).optional(),
+  bairro: z.string().trim().max(100).optional(),
+  cep: z.string().trim().transform(v => v.replace('-', '')).refine(v => !v || /^\d{8}$/.test(v), 'CEP inválido').optional()
+};
+
 const companyFields = {
+  ...companyRegistryFields,
   razao_social: text('Razão social', 200),
   nome_fantasia: z.string().trim().max(200).default(''),
   email_empresa: emailSchema,
@@ -29,10 +41,11 @@ const companyFields = {
 
 export const registerSchema = z.object({
   ...companyFields,
-  cnpj: z.string().trim().regex(/^[\d./-]+$/, 'Informe um CNPJ numérico válido')
-    .transform(value => value.replace(/\D/g, '')).refine(validCnpj, 'CNPJ inválido'),
+  cnpj: cnpjSchema,
+  cnae_principal: z.string().regex(/^\d{7}$/).or(z.literal('')).default(''),
+  cnae_descricao: z.string().trim().max(1000).default(''),
   nome: text('Nome'), email: emailSchema, senha: passwordSchema
-}).strict();
+}).strict().refine(data => Boolean(data.cnae_principal) === Boolean(data.cnae_descricao), 'Informe o código e a descrição do CNAE principal');
 export const companySchema = z.object(companyFields).strict();
 export const loginSchema = z.object({
   email: emailSchema,

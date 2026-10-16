@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { states, companySchema, validCnpj } from './validation.js';
+import { states, companySchema, validCnpj, cnpjSchema } from './validation.js';
 
 const optionalText = (max = 200) => z.string().trim().max(max).default('');
 const requiredText = (max = 200) => z.string().trim().min(1, 'Preencha os campos obrigatórios de cada registro').max(max);
@@ -11,7 +11,7 @@ const numeric = (max, integer = false, decimals = 2) => z.preprocess(value => {
 const positive = numeric(999999999999, false, 3).refine(value => value === null || value > 0, 'A quantidade deve ser positiva');
 const tags = z.array(requiredText(100)).max(50).default([]).transform(items => [...new Set(items)]);
 const list = schema => z.array(schema.strict()).max(100);
-const cnpj = z.string().trim().regex(/^[\d./-]+$/, 'CNPJ inválido').transform(value => value.replace(/\D/g, '')).refine(validCnpj, 'CNPJ inválido');
+const cnpj = cnpjSchema;
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida').refine(value => {
   const parsed = new Date(value);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0,10) === value;
