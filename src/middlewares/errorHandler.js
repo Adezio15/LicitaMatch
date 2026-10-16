@@ -6,9 +6,13 @@ export function errorHandler(logger) {
     const status = error.code === '23505' ? 409 :
       (error instanceof HttpError && error.status >= 400 && error.status < 500 ? error.status :
         [400, 413, 415].includes(error.status) ? error.status : 500);
-    const message = error.code === '23505' ? 'Não foi possível salvar. Verifique se o e-mail ou CNPJ já está cadastrado.' :
+    const duplicateMessages = {
+      empresas_cnpj_key: 'Este CNPJ já está cadastrado. Entre na conta da empresa para acessá-la.',
+      usuarios_email_unique: 'Este e-mail de acesso já está cadastrado. Entre na sua conta ou use outro e-mail para cadastrar uma nova empresa.'
+    };
+    const message = error.code === '23505' ? (Object.hasOwn(duplicateMessages, error.constraint) ? duplicateMessages[error.constraint] : 'Não foi possível salvar por um conflito de registros. Tente novamente.') :
       error instanceof HttpError ? error.message : status === 500 ? 'Erro interno do servidor' : 'Requisição inválida';
-    logger[status >= 500 ? 'error' : 'warn']({ requestId: req.id, status, code: error.code, method: req.method, path: req.path,
+    logger[status >= 500 ? 'error' : 'warn']({ requestId: req.id, status, code: error.code, constraint: error.constraint, table: error.table, method: req.method, path: req.path,
       usuarioId: req.user?.id, empresaId: req.user?.empresa_id, perfil: req.user?.tipo, plano: req.user?.plano,
       ...(status === 403 && error instanceof HttpError ? { authorizationReason: error.message } : {}) }, 'Falha na requisição');
     if (!req.path.startsWith('/api/') && req.accepts(['json', 'html']) === 'html') {

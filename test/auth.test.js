@@ -104,12 +104,15 @@ test('autenticação e isolamento com SQL e sessões persistidas', async t => {
       assert.notEqual(userA.empresa_id, userB.empresa_id);
       const duplicateAgent = request.agent(app);
       const duplicateToken = await token(duplicateAgent);
-      await duplicateAgent.post('/api/auth/register').set('X-CSRF-Token', duplicateToken)
+      const duplicateEmail = await duplicateAgent.post('/api/auth/register').set('X-CSRF-Token', duplicateToken)
         .send(registration('a@example.test', '12345678000195')).expect(409);
+      assert.match(duplicateEmail.body.error, /e-mail de acesso já está cadastrado/);
+      assert.doesNotMatch(duplicateEmail.body.error, /CNPJ/);
       const { rows } = await db.query("SELECT count(*)::int AS count FROM empresas WHERE cnpj='12345678000195'");
       assert.equal(rows[0].count, 0);
       await duplicateAgent.post('/api/auth/register').set('X-CSRF-Token', duplicateToken)
         .send({ ...registration('hack@example.test', '12345678000195'), tipo: 'admin', plano: 'premium' }).expect(422);
+
     });
 
     await t.test('não permite listar, ler ou alterar usuários de outra empresa', async () => {
@@ -337,4 +340,36 @@ test('seed cria empresa/admin quando a role for informada', async () => {
     assert.equal(rows[0].email, 'admin.local@example.test');
     assert.ok(await bcrypt.compare(password, rows[0].senha_hash));
   } finally { await db.close(); }
+});
+
+
+test('cadastro distingue CNPJ e e-mail duplicados e aceita CNPJ novo após corrigir e-mail', async () => {
+  const db = new PGlite();
+  for (const migration of await readMigrations()) await db.exec(migration.sql);
+  const database = {
+    query: (sql, values) => db.query(sql, values),
+    connect: async () => ({ query: (sql, values) => db.query(sql, values), release() {} })
+  };
+  const app = createApp({ config, database, logger });
+  const agent = request.agent(app);
+  async function register(email, cnpj) {
+    const csrf = (await agent.get('/api/auth/csrf').expect(200)).body.csrfToken;
+    return agent.post('/api/auth/register').set('X-CSRF-Token', csrf).send(registration(email, cnpj));
+  }
+  try {
+    assert.equal((await register('original@example.test', '11222333000181')).status, 201);
+    const duplicateEmail = await register('original@example.test', '11444777000161');
+    assert.equal(duplicateEmail.status, 409);
+    assert.match(duplicateEmail.body.error, /e-mail de acesso já está cadastrado/);
+    assert.doesNotMatch(duplicateEmail.body.error, /CNPJ/);
+    assert.equal((await db.query("SELECT count(*)::int AS total FROM empresas WHERE cnpj='11444777000161'")).rows[0].total, 0);
+    const duplicateCnpj = await register('novo@example.test', '11222333000181');
+    assert.equal(duplicateCnpj.status, 409);
+    assert.match(duplicateCnpj.body.error, /Este CNPJ já está cadastrado/);
+    assert.doesNotMatch(duplicateCnpj.body.error, /e-mail/);
+    assert.equal((await register('novo@example.test', '11444777000161')).status, 201);
+  } finally {
+    app.locals.sessionStore.close();
+    await db.close();
+  }
 });
