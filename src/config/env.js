@@ -60,6 +60,12 @@ const schema = z.object({
   EMAIL_PROVIDER: z.enum(['smtp','resend','brevo_api']).default('smtp'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
   WHATSAPP_SANDBOX_TEST_ENABLED: z.enum(['true','false']).default('false'),
+  WHATSAPP_BOT_ENABLED: z.literal('false').default('false'),
+  WHATSAPP_BOT_OUTBOUND_ENABLED: z.literal('false').default('false'),
+  WHATSAPP_HUMAN_OUTBOUND_ENABLED: z.literal('false').default('false'),
+  WHATSAPP_DAILY_LIMIT: z.coerce.number().int().min(0).max(10000).default(10),
+  WHATSAPP_ESTIMATED_UNIT_COST_BRL: z.coerce.number().min(0).max(1000).optional(),
+  WHATSAPP_STATUS_CALLBACK_URL: z.string().url().default('https://licitamatch.online/api/whatsapp/status'),
   WHATSAPP_ENABLED: z.enum(['true','false']).default('false'),
   WHATSAPP_WEBHOOK_ENABLED: z.enum(['true','false']).default('false'),
   TWILIO_ACCOUNT_SID: z.string().regex(/^AC[0-9a-fA-F]{32}$/).optional(),
@@ -91,6 +97,9 @@ const schema = z.object({
       ctx.addIssue({code:'custom',path:['DATABASE_DIRECT_URL'],message:'WORKER_REQUIRES_DIRECT_CONNECTION'});
     }
   }
+  const callback = URL.canParse(config.WHATSAPP_STATUS_CALLBACK_URL) ? new URL(config.WHATSAPP_STATUS_CALLBACK_URL) : {};
+  if (callback.protocol !== 'https:' || callback.username || callback.password || callback.hash || callback.pathname !== '/api/whatsapp/status')
+    ctx.addIssue({code:'custom',path:['WHATSAPP_STATUS_CALLBACK_URL'],message:'INVALID_PUBLIC_CALLBACK'});
   const webhook = URL.canParse(config.WHATSAPP_WEBHOOK_URL) ? new URL(config.WHATSAPP_WEBHOOK_URL) : {};
   if (webhook.protocol !== 'https:' || webhook.username || webhook.password || webhook.hash || webhook.pathname !== '/api/whatsapp/webhook')
     ctx.addIssue({code:'custom',path:['WHATSAPP_WEBHOOK_URL'],message:'INVALID_PUBLIC_WEBHOOK'});

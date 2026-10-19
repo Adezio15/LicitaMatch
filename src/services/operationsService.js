@@ -64,6 +64,7 @@ export function createOperationsService({ database, config, logger, registry, em
         WHEN m.score<67 THEN 'score_abaixo_do_limite'
         WHEN i.ativo=false THEN 'interesse_inativo'
         WHEN m.status NOT IN ('novo','aceito') THEN 'status_match_nao_elegivel'
+        WHEN NOT (cardinality(i.estados_alertas)=0 OR COALESCE(l.uf=ANY(i.estados_alertas),false)) THEN 'estado_fora_do_interesse'
         WHEN NOT licitacao_permitida(l.modalidade,l.uf) THEN 'modalidade_ou_uf_nao_permitida'
         WHEN a.status='enviado' THEN 'ja_enviado'
         WHEN a.status='enviando' THEN 'envio_em_andamento_ou_resultado_incerto'
@@ -87,7 +88,7 @@ export function createOperationsService({ database, config, logger, registry, em
       SELECT DISTINCT ON (m.empresa_id,m.licitacao_id) m.empresa_id,m.licitacao_id,m.id
       FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
       JOIN empresas e ON e.id=m.empresa_id JOIN licitacoes_pncp l ON l.id=m.licitacao_id
-      WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true
+      WHERE m.score >= $1 AND m.status IN ('novo','aceito') AND i.ativo=true AND (cardinality(i.estados_alertas)=0 OR l.uf=ANY(i.estados_alertas))
         AND ($2::bigint IS NULL OR m.empresa_id=$2) AND ($3::bigint IS NULL OR m.licitacao_id=$3)
         AND plano_efetivo(e) IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND licitacao_permitida(l.modalidade,l.uf)
       ORDER BY m.empresa_id,m.licitacao_id,m.score DESC,m.id
@@ -97,7 +98,7 @@ export function createOperationsService({ database, config, logger, registry, em
       JOIN matches m ON m.empresa_id=a.empresa_id AND m.licitacao_id=a.licitacao_id
       JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
       JOIN empresas e ON e.id=a.empresa_id JOIN licitacoes_pncp l ON l.id=a.licitacao_id
-      WHERE a.status='pendente' AND plano_efetivo(e) IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND i.ativo=true
+      WHERE a.status='pendente' AND plano_efetivo(e) IN ('pro','premium') AND e.status='ativo' AND trim(e.email)<>'' AND i.ativo=true AND (cardinality(i.estados_alertas)=0 OR l.uf=ANY(i.estados_alertas))
         AND ($2::bigint IS NULL OR a.empresa_id=$2) AND ($3::bigint IS NULL OR a.licitacao_id=$3)
         AND m.score >= $1 AND m.status IN ('novo','aceito') AND licitacao_permitida(l.modalidade,l.uf)
       ORDER BY a.id,m.score DESC,m.id LIMIT 25`, [emailMinScore, target?.empresaId ?? null, target?.licitacaoId ?? null]);
@@ -117,7 +118,12 @@ export function createOperationsService({ database, config, logger, registry, em
       const claim = await client.query(`UPDATE alertas_empresa_email SET status='enviando'
         WHERE id=$1 AND status='pendente'
         AND EXISTS (SELECT 1 FROM empresas e WHERE e.id=alertas_empresa_email.empresa_id
-          AND e.status='ativo' AND plano_efetivo(e) IN ('pro','premium')) RETURNING id`, [row.id]);
+          AND e.status='ativo' AND plano_efetivo(e) IN ('pro','premium'))
+        AND EXISTS (SELECT 1 FROM matches m JOIN interesses i ON i.id=m.interesse_id AND i.empresa_id=m.empresa_id
+          JOIN licitacoes_pncp l ON l.id=m.licitacao_id
+          WHERE m.empresa_id=alertas_empresa_email.empresa_id AND m.licitacao_id=alertas_empresa_email.licitacao_id
+          AND i.ativo AND m.score >= $2 AND m.status IN ('novo','aceito')
+          AND (cardinality(i.estados_alertas)=0 OR l.uf=ANY(i.estados_alertas))) RETURNING id`, [row.id,emailMinScore]);
       if (!claim.rows.length) {
         logger.info({ ...context, event: 'automatic.alert.skipped', reason: 'ja_processado' }, 'Alerta automático ignorado');
         continue;
@@ -237,7 +243,20 @@ export function createOperationsService({ database, config, logger, registry, em
     async overview() {
       const tasks = (await database.query('SELECT * FROM tarefas ORDER BY nome')).rows;
       const alerts = (await database.query(`SELECT canal,status,count(*)::int AS total FROM (SELECT 'whatsapp' AS canal,status FROM alertas_empresa_whatsapp UNION ALL SELECT 'email' AS canal,status FROM alertas_empresa_email) deliveries GROUP BY canal,status ORDER BY canal,status`)).rows;
-      return { tasks,alerts,workerEnabled: config.WORKER_ENABLED === 'true',emailEnabled: config.EMAIL_ENABLED === 'true',whatsappEnabled:config.WHATSAPP_ENABLED==='true',
+      const whatsappHistory = (await database.query(`SELECT a.id,a.empresa_id,a.usuario_id,a.licitacao_id,a.status,
+        a.created_at,a.enviado_em,a.custo_estimado_brl,
+        EXISTS (SELECT 1 FROM whatsapp_status_eventos w WHERE w.mensagem_id=a.provedor_mensagem_id AND w.estado IN ('delivered','read')) AS entregue,
+        EXISTS (SELECT 1 FROM whatsapp_status_eventos w WHERE w.mensagem_id=a.provedor_mensagem_id AND w.estado IN ('failed','undelivered')) AS falha_entrega
+        FROM alertas_empresa_whatsapp a ORDER BY a.id DESC LIMIT 100`)).rows;
+      const whatsappMetrics = (await database.query(`SELECT count(*)::int AS reservadas,
+        count(DISTINCT (empresa_id,licitacao_id)) FILTER (WHERE provedor_mensagem_id IS NOT NULL)::int AS oportunidades,
+        count(*) FILTER (WHERE provedor_mensagem_id IS NOT NULL)::int AS aceitas,
+        count(*) FILTER (WHERE EXISTS (SELECT 1 FROM whatsapp_status_eventos w WHERE w.mensagem_id=a.provedor_mensagem_id AND w.estado IN ('delivered','read')))::int AS entregues,
+        count(*) FILTER (WHERE status='falhou' OR EXISTS (SELECT 1 FROM whatsapp_status_eventos w WHERE w.mensagem_id=a.provedor_mensagem_id AND w.estado IN ('failed','undelivered')))::int AS falhas,
+        count(*) FILTER (WHERE status IN ('enviando','incerto'))::int AS incertas,
+        sum(custo_estimado_brl) AS custo_estimado_brl FROM alertas_empresa_whatsapp a`)).rows[0];
+      const whatsappSuspended = (await database.query('SELECT suspenso FROM whatsapp_controle WHERE id=true')).rows[0]?.suspenso;
+      return { tasks,alerts,whatsappHistory,whatsappMetrics,whatsappSuspended,workerEnabled: config.WORKER_ENABLED === 'true',emailEnabled: config.EMAIL_ENABLED === 'true',whatsappEnabled:config.WHATSAPP_ENABLED==='true',
         diagnostics: { email: channelDiagnostic('EMAIL_ENABLED', emailFields(config)), whatsapp: channelDiagnostic('WHATSAPP_ENABLED', ['TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM']) },
         sources: listPortalSources(registry) };
     },

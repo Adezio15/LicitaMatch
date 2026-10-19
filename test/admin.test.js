@@ -67,6 +67,14 @@ test('admin global acessa painel geral e gestores comuns não acessam', async ()
   assert.match(dashboardPage.text, /Receber no meu e-mail/i);
   assert.match(dashboardPage.text, /Receber no WhatsApp/i);
 
+  const suspensionPath='/admin/operacao/whatsapp-suspensao';
+  await adminAgent.get('/admin/operacao').expect(200);
+  await adminAgent.post(suspensionPath).send({suspenso:'true'}).expect(403);
+  await gestorAgent.post(suspensionPath).set('X-CSRF-Token',gestorLogin.body.csrfToken).send({suspenso:'true'}).expect(403);
+  await adminAgent.post(suspensionPath).set('X-CSRF-Token',adminLogin.body.csrfToken).send({suspenso:'invalid'}).expect(422);
+  await adminAgent.post(suspensionPath).set('X-CSRF-Token',adminLogin.body.csrfToken).send({suspenso:'true'}).expect(303);
+  assert.equal((await db.query('SELECT suspenso FROM whatsapp_controle')).rows[0].suspenso,true);
+  await adminAgent.post(suspensionPath).set('X-CSRF-Token',adminLogin.body.csrfToken).send({suspenso:'false'}).expect(303);
   await gestorAgent.get('/admin').expect(403);
   await gestorAgent.get('/api/admin/empresas').expect(403);
   await adminAgent.get('/api/admin/empresas').expect(200);

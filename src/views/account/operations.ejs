@@ -31,5 +31,14 @@
 <% for (const task of data.tasks) { %><tr><td><%= task.nome %></td><td><%= states[task.estado] || task.estado %></td><td><%= format(task.ultimo_sucesso) %></td><td><%= format(task.proxima_execucao) %></td><td><% if (task.resumo.inserted !== undefined) { %><%= task.resumo.inserted %> importações em <%= task.resumo.pages %> páginas<% } else if (task.resumo.matches !== undefined) { %><%= task.resumo.matches %> correlações atualizadas<% } else if (task.resumo.sent !== undefined) { %><%= task.resumo.sent %> enviados; <%= task.resumo.failed %> falhas<% } %><% if (task.cursor.page) { %> · Continua na página <%= task.cursor.page %><% } %></td></tr><% } %>
 </tbody></table></div><% } %></section>
 <section class="panel section-gap"><h2>Fila de alertas</h2><p class="muted">“Enviado” indica aceitação pelo provedor, não confirmação de entrega ou leitura.</p><% if (!data.alerts.length) { %><p>Nenhum alerta na fila.</p><% } %><% for (const item of data.alerts) { %><p><%= item.canal==='whatsapp' ? 'WhatsApp' : 'E-mail' %> — <%= item.status %>: <%= item.total %></p><% } %></section>
+<section class="panel section-gap"><h2>Notificações WhatsApp</h2>
+<p>Oportunidades notificadas: <%= data.whatsappMetrics.oportunidades %> · Aceitas pela Twilio: <%= data.whatsappMetrics.aceitas %> · Entregas confirmadas: <%= data.whatsappMetrics.entregues %></p>
+<p>Falhas: <%= data.whatsappMetrics.falhas %> · Estados incertos/em envio: <%= data.whatsappMetrics.incertas %> · Suspensão imediata: <%= data.whatsappSuspended ? 'ativa' : 'inativa' %></p>
+<form method="post" action="/admin/operacao/whatsapp-suspensao"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="suspenso" value="<%= data.whatsappSuspended ? 'false' : 'true' %>"><button type="submit" class="button secondary"><%= data.whatsappSuspended ? 'Remover suspensão das notificações' : 'Suspender notificações imediatamente' %></button></form>
+<p>Custo estimado das reservas (BRL): <%= data.whatsappMetrics.custo_estimado_brl ?? 'não configurado' %>. A estimativa não representa cobrança confirmada.</p>
+<p>Consentimento e cancelamento: cada responsável configura o recebimento na própria conta. STOP, SAIR, PARAR ou CANCELAR no WhatsApp cancelam o recebimento.</p>
+<div class="table-wrap"><table><thead><tr><th>Notificação</th><th>Empresa / usuário</th><th>Licitação</th><th>Estado</th><th>Entrega</th><th>Data</th></tr></thead><tbody>
+<% for (const item of data.whatsappHistory) { %><tr><td><%= item.id %></td><td><%= item.empresa_id %> / <%= item.usuario_id %></td><td><%= item.licitacao_id %></td><td><%= item.status %></td><td><%= item.entregue ? 'Confirmada' : item.falha_entrega ? 'Falhou' : 'Sem confirmação' %></td><td><%= format(item.created_at) %></td></tr><% } %>
+</tbody></table></div></section>
 </main></div>
 <%- include('../partials/footer') %>

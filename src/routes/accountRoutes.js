@@ -69,6 +69,12 @@ export function accountRoutes(database, config, logger) {
   router.get('/admin/operacao', requireAuth, requireAdmin, async (req,res) => {
     res.render('account/operations', { title: 'Operação', data: await req.app.locals.operations.overview(), scheduled: req.query.agendado === '1', emailTest: req.query.emailTeste });
   });
+  router.post('/admin/operacao/whatsapp-suspensao', requireAuth, requireAdmin, async (req,res) => {
+    if (!['true','false'].includes(req.body.suspenso)) return res.status(422).json({error:'Suspensão inválida.'});
+    await database.query('UPDATE whatsapp_controle SET suspenso=$1 WHERE id=true',[req.body.suspenso==='true']);
+    logger.info({event:'whatsapp.suspension.changed',usuarioId:req.user.id,suspended:req.body.suspenso==='true'},'Suspensão das notificações atualizada');
+    res.redirect(303,'/admin/operacao');
+  });
   // Temporary email diagnostic; restricted to administrators and protected by CSRF.
   router.post('/admin/operacao/email-teste', requireAuth, requireAdmin,
     rateLimit({ windowMs: 60000, limit: 3, standardHeaders: 'draft-8', legacyHeaders: false }),

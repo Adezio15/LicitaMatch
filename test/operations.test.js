@@ -102,6 +102,10 @@ test('fluxo HTTP: interesses, correlação, status, preferências, permissões e
     const whatsappPage=await a.get('/conta').expect(200);
     assert.match(whatsappPage.text,/Salvar WhatsApp/);
     await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send({...whatsapp,alertas_whatsapp:false,confirmar_whatsapp:false}).expect(200);
+    await db.query("UPDATE empresas SET plano='sem_plano' WHERE id=$1",[first.company.id]);
+    await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send(whatsapp).expect(403);
+    await a.post('/api/conta/whatsapp').set('X-CSRF-Token',first.csrfToken).send({...whatsapp,alertas_whatsapp:false,confirmar_whatsapp:false}).expect(200);
+    await db.query("UPDATE empresas SET plano='premium' WHERE id=$1",[first.company.id]);
     assert.equal((await db.query('SELECT alertas_email FROM usuarios WHERE id=$1',[first.user.id])).rows[0].alertas_email,true);
     await a.post('/api/usuarios').set('X-CSRF-Token',first.csrfToken).send({nome:'Leitor',email:'reader@example.test',senha:'Senha-teste-segura-2026!',tipo:'usuario'}).expect(201);
     const token = (await member.get('/api/auth/csrf')).body.csrfToken;

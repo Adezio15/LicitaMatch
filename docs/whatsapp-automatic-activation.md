@@ -1,3 +1,7 @@
+> Política vigente: [WhatsApp somente notificações](whatsapp-notifications-only.md).
+> As regras abaixo são históricas; respostas de boas-vindas foram desabilitadas,
+> produção usa quatro variáveis e licitações antigas também são excluídas.
+
 # Preparação dos alertas automáticos WhatsApp
 
 Estas alterações não habilitam flags, não configuram Twilio e não recuperam oportunidades antigas.

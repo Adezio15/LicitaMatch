@@ -11,6 +11,8 @@ export const interestSchema = z.object({
   palavras: z.union([z.string().max(2000), z.array(z.string().max(100)).max(30)])
     .transform(v => [...new Set((Array.isArray(v) ? v : v.split(/[,;\n]/)).map(x => x.trim()).filter(Boolean))])
     .pipe(z.array(z.string().min(3).max(100)).min(1).max(30)),
+  estados_alertas: z.union([z.enum(states), z.literal(''), z.array(z.union([z.enum(states), z.literal('')])).max(28)])
+    .transform(value => [...new Set((Array.isArray(value) ? value : [value]).filter(Boolean))]).optional(),
   ativo: flag.default(true)
 }).strict();
 export const statusSchema = z.object({ status: z.enum(['novo', 'revisado', 'aceito', 'recusado']) }).strict();
@@ -126,10 +128,10 @@ export function opportunityService(database) {
     },
     async saveInterest(empresaId, data, id = null) {
       const { rows } = id
-        ? await database.query(`UPDATE interesses SET titulo=$3,palavras=$4,ativo=$5
-            WHERE empresa_id=$1 AND id=$2 RETURNING *`, [empresaId,id,data.titulo,data.palavras,data.ativo])
-        : await database.query('INSERT INTO interesses (empresa_id,titulo,palavras,ativo) VALUES ($1,$2,$3,$4) RETURNING *',
-          [empresaId,data.titulo,data.palavras,data.ativo]);
+        ? await database.query(`UPDATE interesses SET titulo=$3,palavras=$4,ativo=$5,estados_alertas=COALESCE($6::text[],estados_alertas)
+            WHERE empresa_id=$1 AND id=$2 RETURNING *`, [empresaId,id,data.titulo,data.palavras,data.ativo,data.estados_alertas ?? null])
+        : await database.query('INSERT INTO interesses (empresa_id,titulo,palavras,ativo,estados_alertas) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+          [empresaId,data.titulo,data.palavras,data.ativo,data.estados_alertas ?? []]);
       if (!rows[0]) throw new HttpError(404, 'Interesse não encontrado');
       return rows[0];
     },

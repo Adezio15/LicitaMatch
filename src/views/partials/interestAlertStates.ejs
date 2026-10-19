@@ -1,0 +1,13 @@
+<fieldset class="uf-filter">
+  <legend>Estados para receber alertas</legend>
+  <input type="hidden" name="estados_alertas" value="">
+  <details class="uf-select">
+    <summary>Escolher estados (<%= selectedStates.length ? selectedStates.join(', ') : 'todos' %>)</summary>
+    <div class="uf-options">
+      <% for (const state of [...states].sort()) { %>
+        <label class="uf-option"><input type="checkbox" name="estados_alertas" value="<%= state %>" <%= selectedStates.includes(state) ? 'checked' : '' %>><span><%= state %></span></label>
+      <% } %>
+    </div>
+  </details>
+  <small class="muted">Escolha um ou mais estados para os alertas deste interesse. Sem seleção, você recebe alertas de todos os estados.</small>
+</fieldset>

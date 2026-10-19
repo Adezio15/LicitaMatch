@@ -49,7 +49,7 @@ test('modalidades em todas as UFs nas páginas, dashboard e alertas dos dois can
     const allowed = [];
     for (const [index, [uf, modalidade, expected]] of cases.entries()) {
       const id = `regional-${index}`;
-      await persistPncpItems(database, [{ ...base, id, objeto: `${base.objeto} ${index}`, modalidade, uf }]);
+      await persistPncpItems(database, [{ ...base, id, objeto: `${base.objeto} ${index}`, modalidade, uf, urlFonte: 'https://pncp.gov.br/app/editais/fixture-regional' }]);
       const { rows } = await db.query('SELECT id,licitacao_permitida(modalidade,uf) AS allowed FROM licitacoes_pncp WHERE codigo_externo=$1', [id]);
       assert.equal(rows[0].allowed, expected, `${uf}: ${modalidade}`);
       if (expected) allowed.push(id);

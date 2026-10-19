@@ -74,15 +74,15 @@
       <% if (alertsSaved) { %><p class="notice" role="status">Preferências de alertas atualizadas.</p><% } %>
       <p>Como responsável pela empresa, você pode receber no WhatsApp os mesmos resumos de oportunidades enviados por e-mail.</p>
       <% if (!whatsappEnabled) { %><p class="muted">O envio ainda não foi configurado pelo administrador. Você pode salvar seu número e sua preferência.</p><% } %>
-      <% if (user.plano !== 'premium') { %><p>Alertas pelo WhatsApp exigem upgrade para Premium.</p><% } else { %><form method="post" action="/conta/whatsapp" class="stack">
+      <% if (user.plano !== 'premium') { %><p>Alertas pelo WhatsApp exigem upgrade para Premium. Você pode cancelar o consentimento abaixo.</p><% } %><form method="post" action="/conta/whatsapp" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label>Seu celular com DDD<input type="tel" name="whatsapp_numero" autocomplete="tel" maxlength="30" placeholder="(84) 99999-9999" value="<%= user.whatsapp_numero || '' %>"></label>
         <% const whatsappAlertsEnabled = user.alertas_whatsapp !== false; %>
-        <label>Receber oportunidades no WhatsApp<select name="alertas_whatsapp"><option value="false" <%= !whatsappAlertsEnabled ? 'selected' : '' %>>Não receber</option><option value="true" <%= whatsappAlertsEnabled ? 'selected' : '' %>>Receber no WhatsApp</option></select></label>
+        <label>Receber oportunidades no WhatsApp<select name="alertas_whatsapp"><option value="false" <%= !whatsappAlertsEnabled ? 'selected' : '' %>>Não receber</option><% if (user.plano === 'premium') { %><option value="true" <%= whatsappAlertsEnabled ? 'selected' : '' %>>Receber no WhatsApp</option><% } %></select></label>
         <label class="checkbox"><input type="checkbox" name="confirmar_whatsapp">Confirmo que este número é meu e quero receber alertas de oportunidades do LicitaMatch pelo WhatsApp.</label>
         <small class="muted">Confirme para ativar ou atualizar o recebimento. Para cancelar, escolha “Não receber” e salve. A preferência de e-mail é independente.</small>
         <button type="submit" class="button secondary">Salvar WhatsApp</button>
-      </form><% } %>
+      </form>
     </section>
     <% } %>
   </main>

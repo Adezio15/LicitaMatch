@@ -10,8 +10,9 @@ export function opportunityRoutes(database) {
   const router = Router();
   const service = opportunityService(database);
   const reports = reportService(database);
-  router.post(['/conta/whatsapp','/api/conta/whatsapp'],requireAuth,requireManager,requireFeature('whatsapp'),async (req,res)=>{
+  router.post(['/conta/whatsapp','/api/conta/whatsapp'],requireAuth,requireManager,async (req,res)=>{
     const data = validate(whatsappPreferenceSchema,req.body);
+    if (data.alertas_whatsapp) assertFeature(req.user.plano,'whatsapp');
     await database.query(`UPDATE usuarios SET whatsapp_numero=$3,alertas_whatsapp=$4,
       whatsapp_consentimento_em=CASE WHEN NOT $4 THEN NULL
         WHEN NOT alertas_whatsapp OR whatsapp_numero IS DISTINCT FROM $3
@@ -30,7 +31,7 @@ export function opportunityRoutes(database) {
   router.get(['/interesses','/api/interesses'], requireAuth, async (req,res) => {
     const interests = await service.interests(req.user.empresa_id);
     if (req.path.startsWith('/api/')) return res.json({ interests });
-    res.render('account/interests', { title: 'Interesses', interests, saved: req.query.salvo === '1' });
+    res.render('account/interests', { title: 'Interesses', interests, states, saved: req.query.salvo === '1' });
   });
   const save = async (req,res) => {
     const interest = await service.saveInterest(req.user.empresa_id,validate(interestSchema,req.body),req.params.id ? validId(req.params.id) : null);

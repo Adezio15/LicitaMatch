@@ -27,7 +27,7 @@ async function fixture() {
  const db=new PGlite();
  for(const migration of await readMigrations()) await db.exec(migration.sql);
  await db.exec("INSERT INTO empresas (razao_social,cnpj,email,plano) VALUES ('Empresa','11222333000181','a@example.test','premium'); INSERT INTO usuarios (empresa_id,nome,email,senha_hash,tipo,whatsapp_numero,alertas_whatsapp,whatsapp_consentimento_em) VALUES (1,'Gestor','a@example.test','$2b$12$'||repeat('x',53),'gestor','+5584999999999',true,now()); INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Notebooks',ARRAY['notebook']); INSERT INTO licitacoes_pncp (codigo_externo,objeto,data_abertura,unidade_gestora,modalidade,cidade,uf,url_fonte) VALUES ('WA-1','Compra de notebooks',now(),'Secretaria','Pregão Eletrônico','Natal','RN','https://pncp.gov.br/app/editais/123'); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (1,1,1,67);");
- await db.exec('UPDATE matches SET created_at=clock_timestamp()');
+ await db.exec('UPDATE licitacoes_pncp SET created_at=clock_timestamp(); UPDATE matches SET created_at=clock_timestamp()');
  const query=(sql,values)=>sql.includes('pg_try_advisory_lock')?Promise.resolve({rows:[{locked:true}]}):sql.includes('pg_advisory_unlock')?Promise.resolve({rows:[]}):db.query(sql,values);
  return {db,database:{query,connect:async()=>({query,release(){}})}};
 }
@@ -71,7 +71,7 @@ test('adaptador Twilio usa janela ativa no Sandbox e ContentSid em produção',a
  await createWhatsAppService({config:production,client}).sendMatchAlert({...payload,lastInboundAt:undefined});
  assert.equal(message.contentSid,production.TWILIO_WHATSAPP_CONTENT_SID);
  assert.equal(message.body,undefined);
- assert.deepEqual(JSON.parse(message.contentVariables),{'1':'Compra de notebooks','2':'Secretaria','3':'Natal','4':'RN','5':'67','6':payload.item.urlFonte});
+ assert.deepEqual(JSON.parse(message.contentVariables),{'1':'Compra de notebooks','2':'Secretaria','3':'67','4':payload.item.urlFonte});
  await assert.rejects(createWhatsAppService({config:{...production,WHATSAPP_PRODUCTION_READY:'false'},client}).sendMatchAlert(payload));
 });
 test('falhas Twilio não expõem credenciais nem interpretam falta de SID como aceitação',async()=>{
@@ -96,7 +96,7 @@ test('webhook real do createApp valida URL pública, assinatura, campos, autoriz
   await post({...body,To:'whatsapp:+14155238887'}).expect(403);
   await request(app).post('/api/whatsapp/webhook').send(body).expect(415);
   const response=await post().expect(200).expect('Content-Type',/xml/);
-  assert.ok(response.text.includes('Olá! Bem-vindo ao LicitaMatch. Em breve você receberá informações sobre oportunidades de licitação.'));
+  assert.ok(!response.text.includes('<Message>'));
   assert.equal(response.headers['set-cookie'],undefined);
   assert.ok(!(await post().expect(200)).text.includes('<Message>'));
   await db.exec('UPDATE usuarios SET alertas_whatsapp=false');
@@ -115,7 +115,7 @@ test('Webhook independente responde e registra sem ativar alertas automáticos',
  const worker=createOperationsService({database,config:{...webhookConfig,EMAIL_ENABLED:'false',SYNC_ENABLED:'false'},logger,registry:createSourceRegistry(),whatsappService:service});
  try {
   await post(body,'invalid').expect(403);
-  assert.ok((await post().expect(200)).text.includes('<Message>Olá! Bem-vindo ao LicitaMatch. Em breve você receberá informações sobre oportunidades de licitação.</Message>'));
+  assert.ok(!(await post().expect(200)).text.includes('<Message>'));
   assert.equal((await db.query('SELECT mensagem_id,numero FROM whatsapp_inbound')).rows.length,1);
   assert.ok(!(await post().expect(200)).text.includes('<Message>'));
   assert.deepEqual(await sendWhatsAppAlerts({client:database,config:webhookConfig,service,logger}),{sent:0,failed:0});
@@ -154,7 +154,8 @@ test('fila SQL aplica 67%, consentimento, planos, janela, deduplicação e isola
   for(const change of ["UPDATE usuarios SET alertas_whatsapp=false","UPDATE usuarios SET alertas_whatsapp=true,whatsapp_numero='',whatsapp_consentimento_em=NULL","UPDATE usuarios SET whatsapp_numero='+5584999999999',whatsapp_consentimento_em=now(),tipo='usuario'","UPDATE usuarios SET tipo='gestor',ativo=false","UPDATE usuarios SET ativo=true; UPDATE empresas SET status='inativo'","UPDATE empresas SET status='ativo',plano='pro'","UPDATE empresas SET plano='start'","UPDATE empresas SET plano='premium'; UPDATE matches SET score=66"]) {
    await db.exec(change);assert.equal((await run()).sent,0);
   }
-  await db.exec('UPDATE matches SET score=67');
+  // Model a newly ingested procurement after Premium is restored.
+  await db.exec('UPDATE licitacoes_pncp SET created_at=clock_timestamp(); UPDATE matches SET score=67');
   // Two interests matching the same procurement still yield one message.
   await db.exec("INSERT INTO interesses (empresa_id,titulo,palavras) VALUES (1,'Computadores',ARRAY['notebook']); INSERT INTO matches (interesse_id,licitacao_id,empresa_id,score) VALUES (2,1,1,67);");
   assert.equal((await run()).sent,1);assert.equal((await run()).sent,0);assert.equal(calls,1);
@@ -240,7 +241,7 @@ test('diagnósticos do webhook distinguem rejeições sem expor dados sensíveis
   await check(post(app,{...body,From}),400,'sender_invalid');
  await check(post(app,{...body,MessageSid:[sid,sid]}),400,'message_sid_invalid');
  assert.equal(queries,0);
- assert.ok((await check(post(app),200,'welcome_replied')).text.includes('<Message>'));
+ assert.ok(!(await check(post(app),200,'inbound_recorded')).text.includes('<Message>'));
  await check(post(makeApp({WHATSAPP_WEBHOOK_ENABLED:'false'})),200,'webhook_disabled');
  await check(post(makeApp({WHATSAPP_SANDBOX_NUMBERS:'+5584999999998'})),200,'sandbox_number_not_allowed');
  await check(post(makeApp({},[])),200,'sender_not_eligible');
@@ -248,7 +249,7 @@ test('diagnósticos do webhook distinguem rejeições sem expor dados sensíveis
  await check(post(makeApp({TWILIO_AUTH_TOKEN:undefined})),503,'auth_token_missing');
  await check(request(app).post('/api/whatsapp/webhook').send(body),415,'unsupported_content_type');
  const queryUrl=config.WHATSAPP_WEBHOOK_URL+'?key=a%2Bb&other=c%20d';
- await check(post(makeApp({WHATSAPP_WEBHOOK_URL:queryUrl}),body,twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,queryUrl,body),'/api/whatsapp/webhook?key=a%2Bb&other=c%20d'),200,'welcome_replied');
+ await check(post(makeApp({WHATSAPP_WEBHOOK_URL:queryUrl}),body,twilio.getExpectedTwilioSignature(config.TWILIO_AUTH_TOKEN,queryUrl,body),'/api/whatsapp/webhook?key=a%2Bb&other=c%20d'),200,'inbound_recorded');
  const serialized=JSON.stringify(logs);
  for(const secret of [config.TWILIO_AUTH_TOKEN,config.TWILIO_ACCOUNT_SID,config.TWILIO_WHATSAPP_FROM,payload.to,sid,body.Body,body.FutureParameter,'private-signature','private-query','private SQL token','spoofed.example']) assert.ok(!serialized.includes(secret));
 });
@@ -291,7 +292,7 @@ test('formulário preserva + codificado, rejeita dupla codificação e valida as
   const data={...baseBody,From};
   const {result}=await post(data);
   assert.equal(result.status,200);
-  assert.ok(result.text.includes('<Message>'));
+  assert.ok(!result.text.includes('<Message>'));
   assert.equal(parsed.at(-1).From,From);
   assert.equal(parsed.at(-1).Body,baseBody.Body);
   assert.equal(lookups.at(-2)[0],'+5511987654321');
@@ -340,7 +341,7 @@ test('número com oito dígitos exige lista e cadastro exatos, consentimento e e
   // No inferred alias for the existing nine-digit registered number.
   assert.ok(!(await post().expect(200)).text.includes('<Message>'));
   await db.query('UPDATE usuarios SET whatsapp_numero=$1',[short]);
-  assert.ok((await post().expect(200)).text.includes('<Message>'));
+  assert.ok(!(await post().expect(200)).text.includes('<Message>'));
   assert.equal((await db.query('SELECT numero FROM whatsapp_inbound')).rows[0].numero,short);
   assert.ok(!(await post({...body,From:'whatsapp:'+payload.to,MessageSid:'SM'+'2'.repeat(32)}).expect(200)).text.includes('<Message>'));
   const sent=[];

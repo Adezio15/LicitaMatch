@@ -14,24 +14,30 @@ export function createWhatsAppService({ config, client, now = () => Date.now(), 
     if (!config.TWILIO_ACCOUNT_SID || !config.TWILIO_AUTH_TOKEN || !config.TWILIO_WHATSAPP_FROM) throw new Error('Twilio não configurada.');
     const to = normalizeWhatsAppNumber(payload.to);
     if (!to) throw new Error('Número obrigatório.');
+    for (const field of ['objeto','unidadeGestora','urlFonte']) {
+      if (typeof payload.item?.[field] !== 'string' || !payload.item[field].trim())
+        throw Object.assign(new Error('Dados obrigatórios ausentes.'),{definitive:true});
+    }
     const { item, score } = alertContent(payload);
+    if (!item.urlFonte) throw Object.assign(new Error('Link oficial inválido.'),{definitive:true});
     if (score < 67) throw new Error('Compatibilidade abaixo de 67%.');
-    const city = String(payload.item?.municipio || 'Não informado').replace(/\s+/g,' ').slice(0,200);
-    const uf = String(payload.item?.uf || 'N/D').slice(0,2);
-    const variables = {'1':item.objeto,'2':item.unidadeGestora,'3':city,'4':uf,'5':String(score),'6':item.urlFonte || 'Link não disponível'};
+    const city = String(payload.item?.municipio || '').replace(/\s+/g,' ').slice(0,200);
+    const uf = String(payload.item?.uf || '').slice(0,2);
+    const variables = {'1':item.objeto,'2':item.unidadeGestora,'3':city,'4':uf,'5':String(score),'6':item.urlFonte};
     const message = { from:config.TWILIO_WHATSAPP_FROM,to:'whatsapp:'+to };
     if ((config.WHATSAPP_MODE || 'sandbox') === 'sandbox') {
       if (!sandboxAllowed(config,to)) throw new Error('Destinatário não autorizado no Sandbox.');
       const last = new Date(payload.lastInboundAt).getTime();
       if (!Number.isFinite(last) || last > now() || now()-last >= 86400000) throw new Error('Sandbox exige janela de atendimento ativa.');
       message.body = ['LicitaMatch — oportunidade','Objeto: '+variables['1'],'Órgão: '+variables['2'],
-        'Município/UF: '+city+'/'+uf,...(payload.item?.valorEstimado != null && Number.isFinite(Number(payload.item.valorEstimado)) ? ['Valor estimado: '+new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(payload.item.valorEstimado))] : []),'Compatibilidade: '+score+'%',variables['6']].join('\n');
+        ...(city || uf ? ['Município/UF: '+[city,uf].filter(Boolean).join('/')] : []),...(payload.item?.valorEstimado != null && Number.isFinite(Number(payload.item.valorEstimado)) ? ['Valor estimado: '+new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(payload.item.valorEstimado))] : []),'Compatibilidade: '+score+'%',variables['6']].join('\n');
     } else {
       if (config.WHATSAPP_PRODUCTION_READY !== 'true' || !/^HX[0-9a-fA-F]{32}$/.test(config.TWILIO_WHATSAPP_CONTENT_SID || ''))
         throw new Error('Produção exige remetente aprovado e template configurado.');
       message.contentSid = config.TWILIO_WHATSAPP_CONTENT_SID;
-      message.contentVariables = JSON.stringify(variables);
+      message.contentVariables = JSON.stringify({'1':item.objeto,'2':item.unidadeGestora,'3':String(score),'4':item.urlFonte});
     }
+    if (config.WHATSAPP_STATUS_CALLBACK_URL) message.statusCallback = config.WHATSAPP_STATUS_CALLBACK_URL;
     provider ||= twilio(config.TWILIO_ACCOUNT_SID,config.TWILIO_AUTH_TOKEN,{timeout:15000,autoRetry:false});
     let result;
     try { result = await provider.messages.create(message); }

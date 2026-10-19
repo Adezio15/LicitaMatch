@@ -1,3 +1,7 @@
+> Política vigente: [WhatsApp somente notificações](whatsapp-notifications-only.md).
+> As regras abaixo são históricas; respostas de boas-vindas foram desabilitadas,
+> produção usa quatro variáveis e licitações antigas também são excluídas.
+
 # WhatsApp oficial via Twilio
 
 O adaptador usa o SDK oficial Twilio. E-mail, autenticação e regras comerciais permanecem independentes. A política existente autoriza somente responsáveis (gestor/admin) de empresas ativas com plano efetivo Premium. O gate fica em src/services/whatsappAlertsService.js e é compartilhado com o webhook, permitindo ajustar os planos futuramente sem mudar o adaptador.
